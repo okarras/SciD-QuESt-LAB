@@ -15,8 +15,9 @@ export default function HeroBanner({ onTryDemo }: HeroBannerProps) {
             <span className="gradient-text">Knowledge</span>
           </h1>
           <p className="hero-banner__lead fade-in fade-in-delay-2">
-            SciD-QuESt is a reusable React library for extracting structured information from
-            research papers — with template-driven forms, AI-assisted suggestions, and answer
+            SciD-QuESt stands for Scientific Documents and Questionnaire-based Extraction and
+            Structuring. It is a reusable React library for extracting structured information
+            from research papers with template-driven forms, AI-assisted suggestions, and answer
             verification. Bring your own LLM, upload a PDF, and let AI help you analyze
             scientific literature.
           </p>
