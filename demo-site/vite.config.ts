@@ -4,6 +4,8 @@ import path from 'path'
 
 // https://vite.dev/config/
 export default defineConfig({
+  envDir: __dirname,
+  envPrefix: ['VITE_', 'OPENROUTER_'],
   plugins: [react()],
   optimizeDeps: {
     include: ['react-pdf', 'pdfjs-dist', 'react-redux', '@reduxjs/toolkit'],

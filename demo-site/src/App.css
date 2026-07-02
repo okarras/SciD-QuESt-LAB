@@ -650,6 +650,210 @@ input:focus-visible {
   background: var(--clr-bg-3);
 }
 
+/* ── Live Demo — PDF Viewer ─────────────────────────────────────────────────── */
+.demo-workspace {
+  --pdf-canvas-bg: #dfe4ea;
+  --pdf-toolbar-bg: #ffffff;
+}
+
+.demo-workspace .react-pdf__Document {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+
+.demo-workspace [data-page] {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.demo-workspace .react-pdf__Page .textLayer {
+  border-radius: 4px;
+}
+
+.demo-workspace .react-pdf__Page .annotationLayer {
+  border-radius: 4px;
+}
+
+/* PDF file tabs — close button hover */
+.demo-workspace .MuiTab-root .MuiBox-root span[role="button"],
+.demo-workspace .MuiTab-root .MuiBox-root > span:last-child {
+  border-radius: 4px;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.demo-workspace .MuiTab-root .MuiBox-root > span:last-child:hover {
+  background: rgba(236, 97, 96, 0.12);
+  color: var(--clr-primary);
+}
+
+/* Loading spinner in PDF panel */
+.demo-workspace .MuiBox-root:has(> .react-pdf__Document) .MuiCircularProgress-root {
+  color: var(--clr-primary);
+}
+
+/* ── Demo Questionnaire Fields ──────────────────────────────────────────────── */
+.demo-questionnaire {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 0.25rem 0 1rem;
+}
+
+.demo-questionnaire__header {
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--clr-border);
+}
+
+.demo-questionnaire__title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--clr-text);
+  margin-bottom: 0.2rem;
+}
+
+.demo-questionnaire__meta {
+  font-size: 0.78rem;
+  color: var(--clr-text-3);
+}
+
+.demo-questionnaire__alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--r-md);
+  font-size: 0.82rem;
+}
+
+.demo-questionnaire__alert--error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+}
+
+.demo-questionnaire__retry {
+  border: 1px solid #fca5a5;
+  background: #fff;
+  color: #b91c1c;
+  border-radius: var(--r-sm);
+  padding: 0.3rem 0.65rem;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.demo-questionnaire__section {
+  background: #fff;
+  border: 1px solid var(--clr-border);
+  border-radius: var(--r-lg);
+  padding: 1rem 1.1rem;
+  box-shadow: var(--shadow-card);
+}
+
+.demo-questionnaire__section-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--clr-text);
+  margin-bottom: 0.9rem;
+  padding-bottom: 0.55rem;
+  border-bottom: 1px solid var(--clr-bg-3);
+}
+
+.demo-questionnaire__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.demo-questionnaire__field-header {
+  margin-bottom: 0.55rem;
+}
+
+.demo-questionnaire__label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--clr-text);
+}
+
+.demo-questionnaire__required {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--clr-primary-d);
+  background: #fee2e2;
+  padding: 0.12rem 0.45rem;
+  border-radius: 99px;
+}
+
+.demo-questionnaire__desc {
+  margin-top: 0.3rem;
+  font-size: 0.8rem;
+  color: var(--clr-text-3);
+  line-height: 1.5;
+}
+
+.demo-questionnaire__input .MuiOutlinedInput-root {
+  background: var(--clr-bg-2);
+  border-radius: var(--r-md);
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.demo-questionnaire__input .MuiOutlinedInput-root fieldset {
+  border-color: var(--clr-border);
+}
+
+.demo-questionnaire__input .MuiOutlinedInput-root:hover fieldset {
+  border-color: var(--clr-border-2);
+}
+
+.demo-questionnaire__input .MuiOutlinedInput-root.Mui-focused fieldset {
+  border-color: var(--clr-primary);
+  border-width: 1.5px;
+}
+
+.demo-questionnaire__input .MuiInputBase-input {
+  padding: 0.75rem 0.85rem;
+}
+
+/* Suggest / Verify action buttons only */
+.demo-questionnaire .MuiButton-outlined {
+  text-transform: none;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: var(--r-sm);
+  min-height: 30px;
+}
+
+.demo-questionnaire .MuiButton-outlined:first-of-type {
+  border-color: #93c5fd;
+  color: #1d4ed8;
+}
+
+.demo-questionnaire .MuiButton-outlined:first-of-type:hover {
+  border-color: #60a5fa;
+  background: #eff6ff;
+}
+
+.demo-questionnaire .MuiButton-outlined:last-of-type {
+  border-color: #86efac;
+  color: #15803d;
+}
+
+.demo-questionnaire .MuiButton-outlined:last-of-type:hover {
+  border-color: #4ade80;
+  background: #f0fdf4;
+}
+
 /* ── API Reference ──────────────────────────────────────────────────────────── */
 .api-grid {
   display: grid;

@@ -6,9 +6,12 @@ import {
 } from '@orkg/scidquest';
 import type { UploadedPdf } from '@orkg/scidquest';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
-import { OpenRouterLLM, MockLLM, AVAILABLE_MODELS } from '../services/OpenRouterLLM';
+import { OpenRouterLLM, AVAILABLE_MODELS } from '../services/OpenRouterLLM';
 import type { LLMService, QuestionnaireTemplate } from '@orkg/scidquest';
 import Header from './Header';
+import DemoQuestionnaire from './DemoQuestionnaire';
+
+const OPENROUTER_API_KEY = import.meta.env.OPENROUTER_API_KEY ?? '';
 
 function resolvePdfUrl(path: string): string {
   if (path.startsWith('blob:') || path.startsWith('http://') || path.startsWith('https://')) {
@@ -16,23 +19,6 @@ function resolvePdfUrl(path: string): string {
   }
   return new URL(path, window.location.origin).href;
 }
-
-// Preloaded mock PDF plain text context
-const SAMPLE_PDF_TEXT = `WCI: The Web Context Interface for Agentic Web Automation
-Amirreza Alasti, Niloufar Ghandeharioun, Oliver Karras
-Leibniz University Hannover, TIB Information Centre, Germany
-
-ABSTRACT
-Web agents struggle to interact with complex web environments designed for humans. We propose the Web Context Interface (WCI), a browser-native framework for agentic web automation. WCI enables site operators to expose structured in-context contracts using lightweight semantic HTML annotations.
-
-1. INTRODUCTION
-Large Language Models (LLMs) have accelerated the development of LLM web agents. We evaluate WCI on a benchmark of 50 multi-step grounding scenarios.
-
-3. METHODOLOGY (Student's t-test Evaluation)
-To measure statistical significance of the token reductions and task success rates, we performed a Student's t-test.
-The input dataset consists of success rate percentages and token usage logs across 15,000 runs.
-The specified input parameter contains the paired observation variables: (1) Raw HTML baseline runs, and (2) WCI annotated runs.
-The specified output represents the test statistic: (1) t-value = 5.24, (2) p-value < 0.001, proving highly significant performance gains.`;
 
 // Define ORKG-compliant Red Theme for MUI
 const orkgTheme = createTheme({
@@ -68,35 +54,117 @@ const orkgTheme = createTheme({
   },
 });
 
-// Student's t-test Template Spec matching the screenshot
+// Domain-specific template for the EmpiRE-Compass paper
 const templateSpec: QuestionnaireTemplate = {
   version: '1',
-  template: "Student's t-test",
-  template_id: 'R12002',
+  template: 'EmpiRE-Compass Paper Analysis',
+  template_id: 'EC-DEMO-001',
   sections: [
     {
-      id: 'input-sec',
-      title: 'has specified input',
+      id: 'paper-overview',
+      title: 'Paper Overview',
       questions: [
         {
-          id: 'has_specified_input',
-          label: 'has specified input',
+          id: 'research_problem',
+          label: 'Research problem',
           type: 'text',
           required: true,
-          desc: 'Enter has specified input...',
+          desc: 'Summarize the core problem or gap the paper addresses in sustainable knowledge exploration and reuse.',
+        },
+        {
+          id: 'proposed_solution',
+          label: 'Proposed solution',
+          type: 'text',
+          required: true,
+          desc: 'Describe what EmpiRE-Compass is and the main idea behind the proposed approach.',
+        },
+        {
+          id: 'target_users',
+          label: 'Target users or stakeholders',
+          type: 'text',
+          required: false,
+          desc: 'Identify who is expected to use or benefit from the system, such as researchers, curators, or domain experts.',
         },
       ],
     },
     {
-      id: 'output-sec',
-      title: 'has specified output',
+      id: 'system-design',
+      title: 'System Design',
       questions: [
         {
-          id: 'has_specified_output',
-          label: 'has specified output',
+          id: 'neuro_symbolic_components',
+          label: 'Neuro-symbolic components',
           type: 'text',
           required: true,
-          desc: 'Enter has specified output...',
+          desc: 'Explain the symbolic and neural components that make up the system and how they work together.',
+        },
+        {
+          id: 'dashboard_capabilities',
+          label: 'Dashboard capabilities',
+          type: 'text',
+          required: true,
+          desc: 'List the main features of the dashboard for exploration, synthesis, reuse, or interaction with knowledge.',
+        },
+        {
+          id: 'knowledge_representation',
+          label: 'Knowledge representation',
+          type: 'text',
+          required: false,
+          desc: 'Describe how knowledge is modeled, organized, or linked in the platform.',
+        },
+      ],
+    },
+    {
+      id: 'data-and-workflow',
+      title: 'Data and Workflow',
+      questions: [
+        {
+          id: 'data_sources',
+          label: 'Data sources',
+          type: 'text',
+          required: true,
+          desc: 'Describe the datasets, repositories, or knowledge sources used by the system.',
+        },
+        {
+          id: 'workflow_steps',
+          label: 'Workflow steps',
+          type: 'text',
+          required: true,
+          desc: 'Summarize the main workflow from data ingestion through exploration, synthesis, and reuse.',
+        },
+        {
+          id: 'sustainability_reuse_mechanisms',
+          label: 'Sustainability and reuse mechanisms',
+          type: 'text',
+          required: false,
+          desc: 'Capture how the paper supports long-term maintenance, dynamic updates, interoperability, or reuse of knowledge.',
+        },
+      ],
+    },
+    {
+      id: 'evaluation-and-impact',
+      title: 'Evaluation and Impact',
+      questions: [
+        {
+          id: 'evaluation_method',
+          label: 'Evaluation method',
+          type: 'text',
+          required: true,
+          desc: 'Describe how the authors evaluate the system, such as case studies, experiments, expert feedback, or demonstrations.',
+        },
+        {
+          id: 'key_findings',
+          label: 'Key findings',
+          type: 'text',
+          required: true,
+          desc: 'Summarize the main results, observations, or benefits reported in the paper.',
+        },
+        {
+          id: 'limitations_future_work',
+          label: 'Limitations and future work',
+          type: 'text',
+          required: false,
+          desc: 'Note any limitations, open challenges, or future research directions mentioned by the authors.',
         },
       ],
     },
@@ -108,40 +176,36 @@ interface LiveDemoProps {
 }
 
 export default function LiveDemo({ onBack }: LiveDemoProps) {
-  const [mode, setMode] = useState<'mock' | 'live'>('mock');
-  const [apiKey, setApiKey] = useState('');
   const [selectedModel, setSelectedModel] = useState(AVAILABLE_MODELS[0].id);
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
   const [showConfig, setShowConfig] = useState(false);
 
-  // Controlled files state to allow uploading custom PDFs alongside the preloaded wci.pdf
   const initialFile = useMemo<UploadedPdf>(() => ({
-    id: 'wci-paper',
-    name: 'wci.pdf',
-    size: 1048576, // 1MB
-    url: resolvePdfUrl('/wci.pdf'),
-    extractionStatus: 'done' as const,
-    extractedText: SAMPLE_PDF_TEXT,
+    id: 'empire-compass',
+    name: 'empire-compass.pdf',
+    size: 1_120_998,
+    url: resolvePdfUrl('/empire-compass.pdf'),
+    extractionStatus: 'idle',
   }), []);
 
   const [files, setFiles] = useState<UploadedPdf[]>([initialFile]);
-  const [activeFileId, setActiveFileId] = useState<string | null>('wci-paper');
+  const [activeFileId, setActiveFileId] = useState<string | null>('empire-compass');
 
-  const llmService: LLMService = useMemo(() => {
-    if (mode === 'mock') return new MockLLM();
-    return new OpenRouterLLM(apiKey, selectedModel);
-  }, [mode, apiKey, selectedModel]);
+  const llmService: LLMService = useMemo(
+    () => new OpenRouterLLM(OPENROUTER_API_KEY, selectedModel),
+    [selectedModel],
+  );
+
+  const selectedModelName = AVAILABLE_MODELS.find((m) => m.id === selectedModel)?.name ?? selectedModel;
 
   return (
     <ThemeProvider theme={orkgTheme}>
       <QuestionnaireAIProvider>
         <ScidQuestProvider llmService={llmService}>
-          <div className="demo-wrapper" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#f8fafc', color: '#1e293b' }}>
-            
-            {/* Standard landing header replicated at the top of the demo page */}
+          <div className="demo-wrapper" style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#f8fafc', color: '#1e293b', overflow: 'hidden' }}>
+
             <Header onTryDemo={() => {}} />
 
-            {/* Sub-Header Toolbar with Submit and AI Settings */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
@@ -152,8 +216,6 @@ export default function LiveDemo({ onBack }: LiveDemoProps) {
               flexWrap: 'wrap',
               gap: '8px'
             }}>
-
-              {/* Left: Back to landing */}
               <button
                 onClick={onBack}
                 style={{
@@ -170,8 +232,12 @@ export default function LiveDemo({ onBack }: LiveDemoProps) {
                 ← Back to Home
               </button>
 
-              {/* Right: AI Settings Button */}
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                {!OPENROUTER_API_KEY && (
+                  <span style={{ fontSize: '0.78rem', color: '#dc2626', fontWeight: 600 }}>
+                    Missing OPENROUTER_API_KEY in .env
+                  </span>
+                )}
                 <button
                   onClick={() => setShowConfig(!showConfig)}
                   style={{
@@ -185,12 +251,11 @@ export default function LiveDemo({ onBack }: LiveDemoProps) {
                     cursor: 'pointer',
                   }}
                 >
-                  ⚙️ AI Settings ({mode === 'mock' ? 'Mock' : 'OpenRouter'})
+                  ⚙️ Model: {selectedModelName}
                 </button>
               </div>
             </div>
 
-            {/* Collapsible AI Config Dropdown Banner */}
             {showConfig && (
               <div style={{
                 background: '#ffffff',
@@ -200,74 +265,35 @@ export default function LiveDemo({ onBack }: LiveDemoProps) {
                 flexWrap: 'wrap',
                 gap: '16px',
                 alignItems: 'flex-end',
-                animation: 'fadeSlideIn 0.25s ease'
               }}>
-                <div style={{ flex: '0 0 auto' }}>
-                  <label className="demo-config__label" style={{ color: '#475569' }}>Mode</label>
-                  <div className="demo-mode-toggle" style={{ border: '1px solid #cbd5e1' }}>
-                    <button
-                      className={`demo-mode-btn ${mode === 'mock' ? 'active' : ''}`}
-                      onClick={() => setMode('mock')}
-                      style={{ background: mode === 'mock' ? '#EC6160' : '#ffffff', color: mode === 'mock' ? '#ffffff' : '#475569' }}
-                    >
-                      🧪 Mock
-                    </button>
-                    <button
-                      className={`demo-mode-btn ${mode === 'live' ? 'active' : ''}`}
-                      onClick={() => setMode('live')}
-                      style={{ background: mode === 'live' ? '#EC6160' : '#ffffff', color: mode === 'live' ? '#ffffff' : '#475569' }}
-                    >
-                      🌐 Live OpenRouter
-                    </button>
-                  </div>
+                <div style={{ minWidth: '240px', maxWidth: '360px' }}>
+                  <label className="demo-config__label" style={{ color: '#475569' }}>OpenRouter Model</label>
+                  <select
+                    value={selectedModel}
+                    onChange={(e) => setSelectedModel(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '6px 12px',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '6px',
+                      fontSize: '0.85rem',
+                      background: '#ffffff'
+                    }}
+                  >
+                    {AVAILABLE_MODELS.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-
-                {mode === 'live' && (
-                  <>
-                    <div style={{ flex: 1, minWidth: '200px' }}>
-                      <label className="demo-config__label" style={{ color: '#475569' }}>OpenRouter API Key</label>
-                      <input
-                        type="password"
-                        placeholder="sk-or-v1-..."
-                        value={apiKey}
-                        onChange={(e) => setApiKey(e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '6px 12px',
-                          border: '1px solid #cbd5e1',
-                          borderRadius: '6px',
-                          fontSize: '0.85rem'
-                        }}
-                      />
-                    </div>
-                    <div style={{ minWidth: '200px' }}>
-                      <label className="demo-config__label" style={{ color: '#475569' }}>Model</label>
-                      <select
-                        value={selectedModel}
-                        onChange={(e) => setSelectedModel(e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '6px 12px',
-                          border: '1px solid #cbd5e1',
-                          borderRadius: '6px',
-                          fontSize: '0.85rem',
-                          background: '#ffffff'
-                        }}
-                      >
-                        {AVAILABLE_MODELS.map((m) => (
-                          <option key={m.id} value={m.id}>
-                            {m.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </>
-                )}
               </div>
             )}
 
-            {/* Core Split-Panel Workspace area (ResearchQuestionnaireApp in split layout) */}
-            <div style={{ background: '#f8fafc', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', height: 'calc(100vh - 120px)' }}>
+            <div
+              className="demo-workspace"
+              style={{ background: '#f8fafc', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', padding: '12px 16px 16px', overflow: 'hidden' }}
+            >
               <ResearchQuestionnaireApp
                 templateSpec={templateSpec}
                 answers={answers}
@@ -278,35 +304,93 @@ export default function LiveDemo({ onBack }: LiveDemoProps) {
                 controlledActiveFileId={activeFileId}
                 onFilesChange={setFiles}
                 onActiveFileIdChange={setActiveFileId}
-                multiple={true} // Allow multiple files so upload adds tabs and shows PDF view
+                multiple={true}
+                questionnaireSlot={(ctx) => <DemoQuestionnaire {...ctx} />}
                 sx={{
                   flex: 1,
                   height: '100%',
                   minHeight: 0,
-                  '& .MuiPaper-root': {
-                    border: 'none',
-                    boxShadow: 'none',
-                  },
-                  '& .MuiAccordion-root': {
+                  '& .MuiPaper-outlined': {
                     border: '1px solid #e2e8f0',
-                    borderRadius: '8px',
-                    marginBottom: '12px',
+                    borderRadius: '12px',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.05), 0 4px 16px rgba(0,0,0,0.03)',
                     overflow: 'hidden',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-                    '&::before': {
-                      display: 'none',
+                    background: '#fff',
+                  },
+                  '& .MuiPaper-outlined > .MuiBox-root:nth-of-type(1)': {
+                    borderRight: '1px solid #e2e8f0',
+                    background: '#fff',
+                  },
+                  '& .MuiPaper-outlined > .MuiBox-root:nth-of-type(2)': {
+                    width: '5px',
+                    backgroundColor: '#e2e8f0',
+                    transition: 'background-color 0.2s',
+                    '&:hover': { backgroundColor: '#EC6160' },
+                  },
+                  '& .MuiPaper-outlined > .MuiBox-root:nth-of-type(3)': {
+                    background: '#f1f5f9',
+                  },
+                  '& .MuiTabs-root': {
+                    background: '#fff',
+                    minHeight: 44,
+                    borderBottom: '1px solid #e2e8f0',
+                  },
+                  '& .MuiTab-root': {
+                    fontSize: '0.8rem',
+                    fontWeight: 500,
+                    minHeight: 44,
+                    opacity: 0.75,
+                    transition: 'opacity 0.15s',
+                    '&.Mui-selected': { fontWeight: 600, opacity: 1 },
+                  },
+                  '& .MuiTabs-indicator': {
+                    backgroundColor: '#EC6160',
+                    height: 3,
+                    borderRadius: '3px 3px 0 0',
+                  },
+                  '& .MuiBox-root:has(+ .MuiBox-root > .react-pdf__Document)': {
+                    backgroundColor: '#fff',
+                    borderBottom: '1px solid #e2e8f0',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                    py: 0.75,
+                    gap: 1.5,
+                    '& .MuiIconButton-root': {
+                      borderRadius: '6px',
+                      color: '#475569',
+                      '&:hover': { backgroundColor: '#f1f5f9', color: '#1e293b' },
+                      '&.Mui-disabled': { color: '#cbd5e1' },
                     },
-                    '&.Mui-expanded': {
-                      margin: '0 0 12px 0',
-                    }
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '6px',
+                      backgroundColor: '#f8fafc',
+                      fontSize: '0.85rem',
+                      '& fieldset': { borderColor: '#e2e8f0' },
+                      '&:hover fieldset': { borderColor: '#cbd5e1' },
+                      '&.Mui-focused fieldset': { borderColor: '#EC6160' },
+                    },
+                    '& .MuiTypography-body2': {
+                      fontSize: '0.8rem',
+                      fontWeight: 500,
+                      color: '#64748b',
+                    },
                   },
-                  '& .MuiAccordionSummary-root': {
-                    borderBottom: '1px solid #f1f5f9',
-                    background: '#f8fafc',
+                  '& .MuiBox-root:has(> .react-pdf__Document)': {
+                    backgroundColor: '#dfe4ea',
+                    backgroundImage: 'radial-gradient(circle, rgba(0,0,0,0.035) 1px, transparent 1px)',
+                    backgroundSize: '20px 20px',
+                    padding: '20px 16px',
                   },
-                  '& .MuiAccordion-root.Mui-expanded': {
-                    borderLeft: '4px solid #EC6160'
-                  }
+                  '& .react-pdf__Page': {
+                    borderRadius: '4px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1), 0 0 0 1px rgba(0,0,0,0.05)',
+                    overflow: 'hidden',
+                  },
+                  '& .react-pdf__Page canvas': {
+                    display: 'block',
+                  },
+                  '& [data-page]': {
+                    scrollMarginTop: '12px',
+                  },
                 }}
               />
             </div>
