@@ -250,6 +250,15 @@ input:focus-visible {
   margin-bottom: 1.25rem;
 }
 
+.hero-banner__subtitle {
+  font-size: clamp(1rem, 2vw, 1.25rem);
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--clr-dark-text-2);
+  max-width: 620px;
+  margin-bottom: 1rem;
+}
+
 .hero-banner__lead {
   font-size: 1.1rem;
   line-height: 1.7;
