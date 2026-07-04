@@ -1,3 +1,5 @@
+import SiteLogo from './SiteLogo';
+
 interface HeaderProps {
   onTryDemo: () => void;
 }
@@ -7,8 +9,7 @@ export default function Header({ onTryDemo }: HeaderProps) {
     <header className="site-header">
       <div className="header-inner">
         <a href="#" className="logo">
-          <div className="logo-icon">SQ</div>
-          <span>SciD-QuESt</span>
+          <SiteLogo variant="header" />
         </a>
         <nav className="header-nav">
           <a href="#features" className="header-link">

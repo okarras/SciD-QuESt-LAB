@@ -83,11 +83,6 @@ export class OpenRouterLLM implements LLMService {
 /** Available OpenRouter models for the demo */
 export const AVAILABLE_MODELS = [
   { id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini (Recommended)' },
-  { id: 'openai/gpt-4o', name: 'GPT-4o' },
-  { id: 'openai/gpt-3.5-turbo', name: 'GPT-3.5 Turbo' },
-  { id: 'meta-llama/llama-3.1-8b-instruct', name: 'Llama 3.1 8B' },
-  { id: 'meta-llama/llama-3.1-70b-instruct', name: 'Llama 3.1 70B' },
-  { id: 'google/gemini-2.0-flash-001', name: 'Gemini 2.0 Flash' },
-  { id: 'mistralai/mistral-7b-instruct', name: 'Mistral 7B' },
-  { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet' },
+  { id: 'openai/gpt-oss-120b', name: 'GPT OSS 120B' },
+  { id: 'openai/gpt-oss-20b', name: 'GPT OSS 20B' },
 ];

@@ -5,7 +5,7 @@ import {
 import type { Question } from '@orkg/scidquest';
 import { TextField } from '@mui/material';
 
-function getQuestionLabel(question: Question): string {
+function getQuestionText(question: Question): string {
   return question.label ?? question.title ?? question.id;
 }
 
@@ -56,24 +56,21 @@ export default function DemoQuestionnaire({
             {section.questions.map((question) => {
               if (question.type !== 'text') return null;
 
-              const label = getQuestionLabel(question);
+              const questionText = getQuestionText(question);
               const value = getAnswerString(answers, question.id);
 
               return (
                 <div key={question.id} className="demo-questionnaire__field">
                   <div className="demo-questionnaire__field-header">
                     <label htmlFor={question.id} className="demo-questionnaire__label">
-                      {label}
+                      {questionText}
                       {question.required && <span className="demo-questionnaire__required">Required</span>}
                     </label>
-                    {question.desc && (
-                      <p className="demo-questionnaire__desc">{question.desc}</p>
-                    )}
                   </div>
 
                   <ResearchQuestionnaireFieldAiWrapper
                     questionId={question.id}
-                    questionText={label}
+                    questionText={questionText}
                     questionType="text"
                     currentAnswer={value}
                     aiLayout="buttons"
@@ -84,7 +81,7 @@ export default function DemoQuestionnaire({
                       id={question.id}
                       value={value}
                       onChange={(e) => updateAnswer(question.id, e.target.value)}
-                      placeholder={question.desc ?? `Enter ${label.toLowerCase()}…`}
+                      placeholder="Enter your answer…"
                       multiline
                       minRows={4}
                       maxRows={12}

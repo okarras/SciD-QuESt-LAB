@@ -1,12 +1,12 @@
+import SiteLogo from './SiteLogo';
+import SciDQuEStName from './SciDQuEStName';
+
 export default function Footer() {
   return (
     <footer className="site-footer">
       <div className="footer-inner">
         <a href="#" className="footer-logo">
-          <div className="logo-icon" style={{ width: 24, height: 24, fontSize: '0.6rem' }}>
-            SQ
-          </div>
-          <span>SciD-QuESt</span>
+          <SiteLogo variant="footer" />
         </a>
 
         <nav className="footer-links">
@@ -34,10 +34,17 @@ export default function Footer() {
           >
             🏛 TIB Hannover
           </a>
+          <a
+            href="https://empire-compass.tib.eu/R186491/team"
+            target="_blank"
+            rel="noreferrer"
+          >
+            🧭 EmpiRE-Compass
+          </a>
         </nav>
       </div>
       <p className="footer-copy">
-        SciD-QuESt — AI-assisted research paper analysis. MIT License.
+        <SciDQuEStName variant="footer" /> — AI-assisted research paper analysis. MIT License.
         <br />
         Part of the{' '}
         <a
