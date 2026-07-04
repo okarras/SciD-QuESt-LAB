@@ -203,8 +203,7 @@ export default function FeaturesGrid() {
           Key <span className="gradient-text">Features</span>
         </h2>
         <p className="section-subtitle">
-          Everything you need to build AI-assisted research paper analysis
-          workflows — from PDF ingestion to structured knowledge extraction.
+          PDF ingestion, structured forms, and AI-assisted field workflows.
         </p>
         <div className="features-grid">
           {features.map((f) => (

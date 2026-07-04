@@ -134,7 +134,7 @@ export default function SciDQuEStName({
                 <span className="scidquest-name__hint-context"> — {activeSegment.context}</span>
               </>
             ) : (
-              'Hover each part of the name to explore the acronym'
+              'Hover the name to explore the acronym'
             )}
           </p>
 

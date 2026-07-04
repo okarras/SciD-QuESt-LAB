@@ -222,11 +222,10 @@ export default function CodeExamples() {
           Quick <span className="gradient-text">Start</span>
         </h2>
         <p className="section-subtitle">
-          Get up and running in minutes. Install the package, implement your{' '}
-          <code>LLMService</code>, define a template, and render the app.
+          Install, implement <code>LLMService</code>, define a template, render the app.
         </p>
 
-        <div style={{ maxWidth: 860, margin: '0 auto' }}>
+        <div className="code-examples-wrap">
           <div className="code-tabs">
             {tabs.map((t) => (
               <button

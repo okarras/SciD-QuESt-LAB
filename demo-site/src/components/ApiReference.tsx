@@ -77,16 +77,15 @@ export default function ApiReference() {
           API <span className="gradient-text">Reference</span>
         </h2>
         <p className="section-subtitle">
-          Everything is imported from <code>@orkg/scidquest</code>. Here are the main
-          exports — see{' '}
+          Main exports from <code>@orkg/scidquest</code>. See the{' '}
           <a
             href="https://gitlab.com/TIBHannover/orkg/scidquest/-/blob/main/README.md"
             target="_blank"
             rel="noreferrer"
           >
-            the full README
+            README
           </a>{' '}
-          for detailed prop tables and usage examples.
+          for full prop tables.
         </p>
 
         <div className="api-grid">

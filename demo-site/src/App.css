@@ -51,6 +51,9 @@
   --clr-dark-border:  rgba(255,255,255,0.15);
   --clr-dark-text:    #ffffff;
   --clr-dark-text-2:  #e2e8f0;
+
+  --t-std: 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  --t-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* ── Reset ──────────────────────────────────────────────────────────────────── */
@@ -618,6 +621,32 @@ input:focus-visible {
   max-width: 700px;
   margin: 0 auto 3.5rem;
   line-height: 1.65;
+}
+
+/* ── Entrance (hero only) ─────────────────────────────────────────────────────── */
+.fade-in {
+  animation: fade-in-up 0.6s ease both;
+}
+
+.fade-in-delay-1 { animation-delay: 0.08s; }
+.fade-in-delay-2 { animation-delay: 0.16s; }
+.fade-in-delay-3 { animation-delay: 0.24s; }
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.code-examples-wrap {
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fade-in,
+  .arch-diagram__pulse {
+    animation: none;
+  }
 }
 
 /* ── Features Grid ──────────────────────────────────────────────────────────── */
@@ -1236,58 +1265,97 @@ input:focus-visible {
   }
 }
 
-/* ── Architecture Diagram ─────────────────────────────────────────────────────── */
-.architecture-diagram {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  max-width: 580px;
+/* ── How It Works — provider stack ───────────────────────────────────────────── */
+.arch-diagram {
+  position: relative;
+  max-width: 520px;
   margin: 0 auto 3rem;
+  padding: 0.25rem 0;
+}
+
+.arch-diagram__pulse {
+  position: absolute;
+  left: 50%;
+  top: 12%;
+  width: 7px;
+  height: 7px;
+  margin-left: -3.5px;
+  border-radius: 50%;
+  background: var(--clr-primary);
+  box-shadow: 0 0 14px rgba(236, 97, 96, 0.55);
+  pointer-events: none;
+  z-index: 5;
+  animation: arch-signal 5s ease-in-out infinite;
+}
+
+@keyframes arch-signal {
+  0%, 100% { top: 12%; opacity: 0.25; }
+  12% { top: 12%; opacity: 1; }
+  42% { top: 50%; opacity: 1; }
+  72% { top: 86%; opacity: 1; }
+  88% { top: 86%; opacity: 0.25; }
+}
+
+.arch-diagram:has(.is-focused) .arch-diagram__pulse {
+  animation-play-state: paused;
 }
 
 .arch-layer {
+  display: block;
+  width: 100%;
+  text-align: center;
+  padding: 1.15rem 1.25rem;
+  margin-bottom: 0.65rem;
   border: 2px solid var(--clr-border);
   border-radius: var(--r-md);
-  padding: 1.25rem 1.5rem;
-  text-align: center;
+  background: #fff;
+  cursor: default;
+  font: inherit;
+  transition: opacity 0.3s ease, border-color 0.3s ease, transform 0.3s ease;
   position: relative;
-  transition: border-color var(--t-std), box-shadow var(--t-std);
+  z-index: 1;
 }
 
-.arch-layer:hover {
-  border-color: var(--clr-primary);
-  box-shadow: 0 0 0 3px rgba(219, 59, 59, 0.15);
-}
-
-.arch-layer + .arch-layer {
-  margin-top: -1px;
+.arch-layer:last-child {
+  margin-bottom: 0;
 }
 
 .arch-layer--outer {
   background: #fee2e2;
   border-color: #fca5a5;
-  z-index: 1;
-  padding-bottom: 2.5rem;
 }
 
 .arch-layer--middle {
+  width: calc(100% - 2.5rem);
+  margin-left: auto;
+  margin-right: auto;
   background: #eff6ff;
   border-color: #bfdbfe;
-  z-index: 2;
-  margin: 0 1.5rem;
-  padding-bottom: 2.5rem;
 }
 
 .arch-layer--inner {
-  background: #ffffff;
-  border-color: var(--clr-border-2);
-  z-index: 3;
-  margin: 0 3rem;
+  width: calc(100% - 5rem);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.arch-layer.is-dimmed {
+  opacity: 0.4;
+}
+
+.arch-layer.is-focused {
+  opacity: 1;
+  border-color: var(--clr-primary);
+  transform: scale(1.015);
+  z-index: 2;
+  box-shadow: 0 8px 28px rgba(236, 97, 96, 0.12);
 }
 
 .arch-layer__name {
+  display: block;
+  font-size: 0.92rem;
   font-weight: 700;
-  font-size: 0.95rem;
+  color: var(--clr-primary-d);
   margin-bottom: 0.25rem;
 }
 
@@ -1296,7 +1364,6 @@ input:focus-visible {
   color: var(--clr-text-2);
 }
 
-/* ── Comparison Table ────────────────────────────────────────────────────────── */
 .comparison-table-wrap {
   overflow-x: auto;
   border-radius: var(--r-md);
@@ -1312,24 +1379,33 @@ input:focus-visible {
 
 .comparison-table th {
   background: var(--clr-bg-2);
-  padding: 1.1rem 1.25rem;
+  padding: 0.9rem 1.1rem;
   text-align: left;
   font-weight: 600;
-  border-bottom: 2px solid var(--clr-border);
+  border-bottom: 1px solid var(--clr-border);
   color: var(--clr-text);
-  white-space: nowrap;
 }
 
 .comparison-table td {
-  padding: 0.95rem 1.25rem;
+  padding: 0.85rem 1.1rem;
   border-bottom: 1px solid var(--clr-border);
   color: var(--clr-text-2);
 }
 
-.comparison-table tbody tr:last-child td { border-bottom: none; }
+.comparison-table tbody tr:last-child th,
+.comparison-table tbody tr:last-child td {
+  border-bottom: none;
+}
 
 .comparison-table tbody tr:hover {
-  background: #fff5f5;
+  background: var(--clr-bg-2);
+}
+
+.comparison-table tbody th[scope="row"] {
+  background: transparent;
+  font-weight: 600;
+  color: var(--clr-text);
+  white-space: nowrap;
 }
 
 /* ── Code Examples ──────────────────────────────────────────────────────────── */
