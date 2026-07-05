@@ -57,7 +57,7 @@ const orkgTheme = createTheme({
 // Domain-specific template for the EmpiRE-Compass paper
 const templateSpec: QuestionnaireTemplate = {
   version: '1',
-  template: 'EmpiRE-Compass Paper Analysis',
+  template: 'Exemplary Questionnaire',
   template_id: 'EC-DEMO-001',
   sections: [
     {
@@ -66,19 +66,19 @@ const templateSpec: QuestionnaireTemplate = {
       questions: [
         {
           id: 'research_problem',
-          label: 'What core problem or gap does the paper address in sustainable knowledge exploration and reuse?',
+          label: 'What research problem does the paper address?',
           type: 'text',
           required: true,
         },
         {
           id: 'proposed_solution',
-          label: 'What is EmpiRE-Compass, and what is the main idea behind the proposed approach?',
+          label: 'What is the main idea behind the proposed solution?',
           type: 'text',
           required: true,
         },
         {
           id: 'target_users',
-          label: 'Who is expected to use or benefit from the system (e.g., researchers, curators, or domain experts)?',
+          label: 'Who is expected to use the system?',
           type: 'text',
           required: false,
         },
@@ -90,21 +90,15 @@ const templateSpec: QuestionnaireTemplate = {
       questions: [
         {
           id: 'neuro_symbolic_components',
-          label: 'What symbolic and neural components make up the system, and how do they work together?',
+          label: 'What symbolic and neural components make up the proposed system?',
           type: 'text',
           required: true,
         },
         {
-          id: 'dashboard_capabilities',
-          label: 'What are the main features of the dashboard for exploration, synthesis, reuse, or interaction with knowledge?',
+          id: 'features',
+          label: 'What are the main features of the proposed system?',
           type: 'text',
           required: true,
-        },
-        {
-          id: 'knowledge_representation',
-          label: 'How is knowledge modeled, organized, or linked in the platform?',
-          type: 'text',
-          required: false,
         },
       ],
     },
@@ -114,19 +108,19 @@ const templateSpec: QuestionnaireTemplate = {
       questions: [
         {
           id: 'data_sources',
-          label: 'What datasets, repositories, or knowledge sources does the system use?',
+          label: 'What data sources does the proposed system use?',
           type: 'text',
           required: true,
         },
         {
           id: 'workflow_steps',
-          label: 'What are the main workflow steps from data ingestion through exploration, synthesis, and reuse?',
+          label: 'What are the main workflow steps of the proposed system?',
           type: 'text',
           required: true,
         },
         {
-          id: 'sustainability_reuse_mechanisms',
-          label: 'How does the paper support long-term maintenance, dynamic updates, interoperability, or reuse of knowledge?',
+          id: 'sustainability_mechanisms',
+          label: 'How does the proposed system support long-term sustainability?',
           type: 'text',
           required: false,
         },
@@ -138,19 +132,19 @@ const templateSpec: QuestionnaireTemplate = {
       questions: [
         {
           id: 'evaluation_method',
-          label: 'How do the authors evaluate the system (e.g., case studies, experiments, expert feedback, or demonstrations)?',
+          label: 'How is the proposed system evaluated?',
           type: 'text',
           required: true,
         },
         {
           id: 'key_findings',
-          label: 'What are the main results, observations, or benefits reported in the paper?',
+          label: 'What are the main results reported in the paper?',
           type: 'text',
           required: true,
         },
         {
-          id: 'limitations_future_work',
-          label: 'What limitations, open challenges, or future research directions do the authors mention?',
+          id: 'future_work',
+          label: 'What future work do the authors mention?',
           type: 'text',
           required: false,
         },
