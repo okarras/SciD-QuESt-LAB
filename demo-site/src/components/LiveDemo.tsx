@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   ScidQuestProvider,
   QuestionnaireAIProvider,
@@ -180,24 +180,35 @@ export default function LiveDemo({ onBack }: LiveDemoProps) {
 
   const selectedModelName = AVAILABLE_MODELS.find((m) => m.id === selectedModel)?.name ?? selectedModel;
 
+  // Keep the demo page locked to the viewport so tall questionnaire/PDF
+  // content scrolls inside the split panels instead of stretching the document.
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtmlOverflow = html.style.overflow;
+    const prevBodyOverflow = body.style.overflow;
+    const prevBodyHeight = body.style.height;
+
+    html.style.overflow = 'hidden';
+    body.style.overflow = 'hidden';
+    body.style.height = '100%';
+
+    return () => {
+      html.style.overflow = prevHtmlOverflow;
+      body.style.overflow = prevBodyOverflow;
+      body.style.height = prevBodyHeight;
+    };
+  }, []);
+
   return (
     <ThemeProvider theme={orkgTheme}>
       <QuestionnaireAIProvider>
         <ScidQuestProvider llmService={llmService}>
-          <div className="demo-wrapper" style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#f8fafc', color: '#1e293b', overflow: 'hidden' }}>
+          <div className="demo-wrapper">
 
             <Header onTryDemo={() => {}} />
 
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '12px 24px',
-              background: '#f1f5f9',
-              borderBottom: '1px solid #e2e8f0',
-              flexWrap: 'wrap',
-              gap: '8px'
-            }}>
+            <div className="demo-toolbar">
               <button
                 onClick={onBack}
                 style={{
@@ -239,15 +250,7 @@ export default function LiveDemo({ onBack }: LiveDemoProps) {
             </div>
 
             {showConfig && (
-              <div style={{
-                background: '#ffffff',
-                borderBottom: '1px solid #e2e8f0',
-                padding: '16px 24px',
-                display: 'flex',
-                flexWrap: 'wrap',
-                gap: '16px',
-                alignItems: 'flex-end',
-              }}>
+              <div className="demo-config">
                 <div style={{ minWidth: '240px', maxWidth: '360px' }}>
                   <label className="demo-config__label" style={{ color: '#475569' }}>OpenRouter Model</label>
                   <select
@@ -272,10 +275,7 @@ export default function LiveDemo({ onBack }: LiveDemoProps) {
               </div>
             )}
 
-            <div
-              className="demo-workspace"
-              style={{ background: '#f8fafc', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', padding: '12px 16px 16px', overflow: 'hidden' }}
-            >
+            <div className="demo-workspace">
               <ResearchQuestionnaireApp
                 templateSpec={templateSpec}
                 answers={answers}
@@ -292,12 +292,21 @@ export default function LiveDemo({ onBack }: LiveDemoProps) {
                   flex: 1,
                   height: '100%',
                   minHeight: 0,
+                  maxHeight: '100%',
+                  overflow: 'hidden',
                   '& .MuiPaper-outlined': {
                     border: '1px solid #e2e8f0',
                     borderRadius: '12px',
                     boxShadow: '0 1px 3px rgba(0,0,0,0.05), 0 4px 16px rgba(0,0,0,0.03)',
                     overflow: 'hidden',
                     background: '#fff',
+                    flex: 1,
+                    minHeight: 0,
+                    maxHeight: '100%',
+                  },
+                  '& .MuiPaper-outlined > .MuiBox-root': {
+                    minHeight: 0,
+                    maxHeight: '100%',
                   },
                   '& .MuiPaper-outlined > .MuiBox-root:nth-of-type(1)': {
                     borderRight: '1px solid #e2e8f0',
