@@ -182,21 +182,37 @@ export default function LiveDemo({ onBack }: LiveDemoProps) {
 
   // Keep the demo page locked to the viewport so tall questionnaire/PDF
   // content scrolls inside the split panels instead of stretching the document.
+  // Firefox is especially sensitive to nested scrollIntoView / focus scrolling.
   useEffect(() => {
     const html = document.documentElement;
     const body = document.body;
     const prevHtmlOverflow = html.style.overflow;
     const prevBodyOverflow = body.style.overflow;
     const prevBodyHeight = body.style.height;
+    const prevHtmlScrollBehavior = html.style.scrollBehavior;
+    const prevBodyOverscroll = body.style.overscrollBehavior;
 
     html.style.overflow = 'hidden';
     body.style.overflow = 'hidden';
     body.style.height = '100%';
+    html.style.scrollBehavior = 'auto';
+    body.style.overscrollBehavior = 'none';
+
+    const lockWindowScroll = () => {
+      if (window.scrollX !== 0 || window.scrollY !== 0) {
+        window.scrollTo(0, 0);
+      }
+    };
+    lockWindowScroll();
+    window.addEventListener('scroll', lockWindowScroll, { passive: true });
 
     return () => {
+      window.removeEventListener('scroll', lockWindowScroll);
       html.style.overflow = prevHtmlOverflow;
       body.style.overflow = prevBodyOverflow;
       body.style.height = prevBodyHeight;
+      html.style.scrollBehavior = prevHtmlScrollBehavior;
+      body.style.overscrollBehavior = prevBodyOverscroll;
     };
   }, []);
 

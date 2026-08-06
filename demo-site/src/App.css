@@ -1509,6 +1509,9 @@ input:focus-visible {
 
 /* ── Live Demo — full-viewport shell ────────────────────────────────────────── */
 .demo-wrapper {
+  position: fixed;
+  inset: 0;
+  width: 100%;
   height: 100dvh;
   max-height: 100dvh;
   display: flex;
@@ -1516,6 +1519,7 @@ input:focus-visible {
   background: #f8fafc;
   color: #1e293b;
   overflow: hidden;
+  overscroll-behavior: none;
 }
 
 .demo-wrapper .site-header {
