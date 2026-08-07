@@ -1,0 +1,23 @@
+{
+  "name": "ai-evaluation-benchmark",
+  "version": "1.0.0",
+  "description": "Evaluation system for AI questionnaire assistant against academic papers",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc && cp src/bertscore-calculator.py dist/ && cp -r templates dist/",
+    "evaluate": "npm run build && node dist/index.js",
+    "clean": "rm -rf dist",
+    "rebuild": "npm run clean && npm run build"
+  },
+  "dependencies": {
+    "dotenv": "^16.0.0",
+    "pdf2json": "^3.0.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
