@@ -9,15 +9,20 @@ type Feature = {
 
 const features: Feature[] = [
   {
-    icon: '📄',
-    title: 'PDF Upload & Viewing',
-    desc: 'Drag-and-drop PDF upload with built-in viewer, zoom controls, page navigation, and automatic full-text extraction via pdfjs.',
+    icon: '📁',
+    title: 'Multi-Modal File Upload',
+    desc: 'Drag-and-drop or paste-a-link ingestion for PDFs, spreadsheets, code files, JSON, ZIP archives, and remote links — each file is auto-categorized and routed to the right extraction pipeline.',
     gif: '/fileupload.gif',
+  },
+  {
+    icon: '🗂️',
+    title: 'Built-in File Manager',
+    desc: 'A dedicated panel lists every uploaded file with rename, remove, multi-select bulk delete, and one click to switch the active document — no more juggling loose tabs.',
   },
   {
     icon: '📐',
     title: 'Split-Panel Analysis UI',
-    desc: 'Side-by-side layout with PDF viewer on the left and questionnaire on the right. Evidence highlights and page-jump navigation bridge both panels.',
+    desc: 'Side-by-side layout with the file viewer on the left and questionnaire on the right. Evidence highlights and page-jump navigation bridge both panels.',
     gif: '/splitpanel.gif',
   },
   {
@@ -35,15 +40,23 @@ const features: Feature[] = [
   {
     icon: '✅',
     title: 'AI Verification',
-    desc: 'Verify user answers against source PDF content — both per-field and batch verification from the summary bar, with structured verdict payloads.',
+    desc: 'Verify user answers against source content — both per-field and batch verification from the summary bar, with structured verdict payloads.',
     gif: '/verify.gif',
   },
   {
     icon: '🔌',
     title: 'Embeddable Workflows',
-    desc: 'Use the full app or embed mode: supply a custom questionnaireSlot with your own form while keeping PDF extraction and per-field AI wrappers.',
+    desc: 'Use the full app or embed mode: supply a custom questionnaireSlot with your own form while keeping file extraction and per-field AI wrappers.',
   },
 ];
+
+function FeatureIconPlaceholder({ icon }: { icon: string }) {
+  return (
+    <div className="feature-card__icon-placeholder" aria-hidden="true">
+      {icon}
+    </div>
+  );
+}
 
 function EmbedWorkflowAnimation({ expanded = false }: { expanded?: boolean }) {
   return (
@@ -173,8 +186,10 @@ function FeatureDetailModal({
               width={1200}
               height={421}
             />
-          ) : (
+          ) : feature.title === 'Embeddable Workflows' ? (
             <EmbedWorkflowAnimation expanded />
+          ) : (
+            <FeatureIconPlaceholder icon={feature.icon} />
           )}
         </div>
 
@@ -203,7 +218,7 @@ export default function FeaturesGrid() {
           Key <span className="gradient-text">Features</span>
         </h2>
         <p className="section-subtitle">
-          PDF ingestion, structured forms, and AI-assisted field workflows.
+          Multi-modal file ingestion, structured forms, and AI-assisted field workflows.
         </p>
         <div className="features-grid">
           {features.map((f) => (
@@ -232,8 +247,10 @@ export default function FeaturesGrid() {
                     loading="lazy"
                     decoding="async"
                   />
-                ) : (
+                ) : f.title === 'Embeddable Workflows' ? (
                   <EmbedWorkflowAnimation />
+                ) : (
+                  <FeatureIconPlaceholder icon={f.icon} />
                 )}
                 <span className="feature-card__expand-hint">View demo</span>
               </div>

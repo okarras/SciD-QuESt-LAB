@@ -726,6 +726,12 @@ input:focus-visible {
   object-position: center;
 }
 
+.feature-card__icon-placeholder {
+  font-size: 3.5rem;
+  line-height: 1;
+  opacity: 0.85;
+}
+
 .feature-card__body {
   padding: 1.5rem 1.75rem 2rem;
   flex: 1;
@@ -1616,6 +1622,17 @@ input:focus-visible {
 
 /* Loading spinner in PDF panel */
 .demo-workspace .MuiBox-root:has(> .react-pdf__Document) .MuiCircularProgress-root {
+  color: var(--clr-primary);
+}
+
+/* Multi-modal file manager panel */
+.demo-workspace .rq-file-manager {
+  scrollbar-gutter: stable;
+}
+
+.demo-workspace .rq-file-manager .MuiIconButton-root:hover,
+.demo-workspace .rq-viewer .MuiIconButton-root:hover {
+  background: rgba(236, 97, 96, 0.12);
   color: var(--clr-primary);
 }
 

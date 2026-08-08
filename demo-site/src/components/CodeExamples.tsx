@@ -67,6 +67,7 @@ function App() {
           answers={answers}
           setAnswers={setAnswers}
           layout="split"
+          multiModal // accept sheets, code, JSON, ZIPs, and links — not just PDFs
         />
       </ScidQuestProvider>
     </QuestionnaireAIProvider>
@@ -76,6 +77,49 @@ function App() {
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode><App /></React.StrictMode>
 );`,
+  },
+  {
+    id: 'multimodal',
+    label: 'Multi-Modal Files',
+    lang: 'typescript',
+    code: `import { useState } from "react";
+import type { UploadedFile } from "@orkg/scidquest";
+import { ResearchQuestionnaireApp } from "@orkg/scidquest";
+
+function App() {
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [activeFileId, setActiveFileId] = useState<string | null>(null);
+  const [answers, setAnswers] = useState<Record<string, unknown>>({});
+
+  return (
+    <ResearchQuestionnaireApp
+      templateSpec={templateSpec}
+      answers={answers}
+      setAnswers={setAnswers}
+      layout="split"
+      // Enables sheets, code, JSON, ZIPs, and pasted links — plus the
+      // built-in file manager panel (rename, remove, bulk-delete, switch).
+      multiModal
+      controlledUploadedFiles={uploadedFiles}
+      controlledActiveFileId={activeFileId}
+      onUploadedFilesChange={setUploadedFiles}
+      onActiveFileIdChange={setActiveFileId}
+      maxFiles={10}
+      // Optional: offer host-owned pickers (Drive, Dropbox, ...) alongside
+      // local upload. The library never sees credentials or tokens.
+      externalSources={[
+        {
+          id: "google-drive",
+          label: "Drive",
+          importFiles: async () => {
+            // open your own picker/auth flow, return File[]
+            return [];
+          },
+        },
+      ]}
+    />
+  );
+}`,
   },
   {
     id: 'llm',

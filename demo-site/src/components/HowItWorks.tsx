@@ -14,14 +14,19 @@ const LAYERS = [
   {
     id: 'inner',
     name: 'ResearchQuestionnaireApp',
-    desc: 'PDF viewer, forms, AI wrappers',
+    desc: 'File manager, viewer, forms, AI wrappers',
   },
 ] as const;
 
 const COMPARISON_ROWS = [
   {
+    aspect: 'Ingestion',
+    manual: 'One file format, manual conversion',
+    scidquest: 'PDFs, sheets, code, JSON, ZIPs, and links via one file manager',
+  },
+  {
     aspect: 'Reading',
-    manual: 'External PDF, manual scrolling',
+    manual: 'External viewer, manual scrolling',
     scidquest: 'Built-in viewer with evidence highlights',
   },
   {

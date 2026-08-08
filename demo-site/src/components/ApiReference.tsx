@@ -12,7 +12,7 @@ const apis = [
   {
     name: 'ResearchQuestionnaireApp',
     type: 'component',
-    desc: 'Orchestrates PDF upload, viewer, text extraction, and questionnaire in split or single layout. Supports both default UI and custom questionnaireSlot.',
+    desc: 'Orchestrates file upload, viewer, text extraction, and questionnaire in split or single layout. Set multiModal to accept sheets, code, JSON, ZIPs, and links alongside PDFs, with a built-in file manager panel.',
   },
   {
     name: 'TemplateQuestionnaire',
@@ -20,14 +20,29 @@ const apis = [
     desc: 'Full questionnaire UI with section accordions, validation, JSON export/import, localStorage autosave, and AI verification batch.',
   },
   {
+    name: 'FileManagerPanel',
+    type: 'component',
+    desc: 'Sidebar listing every uploaded file with activate, rename, remove, and multi-select bulk delete. Powers the file manager in multi-modal mode.',
+  },
+  {
+    name: 'FileUpload',
+    type: 'component',
+    desc: 'Drag-and-drop or paste-a-link upload for PDFs, images, CSVs, tables, ZIPs, and repo links, with optional external sources like Drive or Dropbox.',
+  },
+  {
     name: 'PDFUpload',
     type: 'component',
-    desc: 'Drag-and-drop or file-picker PDF upload with type/size validation. Fires onFileSelected with a validated File object.',
+    desc: 'Drag-and-drop or file-picker PDF-only upload with type/size validation. Fires onFileSelected with a validated File object.',
   },
   {
     name: 'PdfViewer',
     type: 'component',
     desc: 'Renders PDF pages via react-pdf with zoom, page controls, text extraction, and highlight overlays for evidence references.',
+  },
+  {
+    name: 'FilePreview',
+    type: 'component',
+    desc: 'Renders the active uploaded file — PDF pages, image, spreadsheet/table, or code — matched to its detected file category.',
   },
   {
     name: 'useSuggestionGenerator',

@@ -1,10 +1,12 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   ScidQuestProvider,
   QuestionnaireAIProvider,
   ResearchQuestionnaireApp,
+  loadFileSession,
+  saveFileSession,
 } from '@orkg/scidquest';
-import type { UploadedPdf } from '@orkg/scidquest';
+import type { UploadedFile } from '@orkg/scidquest';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
 import { OpenRouterLLM, AVAILABLE_MODELS } from '../services/OpenRouterLLM';
 import type { LLMService, QuestionnaireTemplate } from '@orkg/scidquest';
@@ -12,12 +14,27 @@ import Header from './Header';
 import DemoQuestionnaire from './DemoQuestionnaire';
 
 const OPENROUTER_API_KEY = import.meta.env.OPENROUTER_API_KEY ?? '';
+const DEMO_SESSION_DB = 'scidquest-demo';
+const DEMO_TEMPLATE_ID = 'EC-DEMO-001';
 
 function resolvePdfUrl(path: string): string {
   if (path.startsWith('blob:') || path.startsWith('http://') || path.startsWith('https://')) {
     return path;
   }
   return new URL(path, window.location.origin).href;
+}
+
+function createSeedFile(): UploadedFile {
+  return {
+    id: 'empire-compass',
+    name: 'empire-compass.pdf',
+    size: 1_120_998,
+    url: resolvePdfUrl('/empire-compass.pdf'),
+    category: 'pdf',
+    mimeType: 'application/pdf',
+    extractionStatus: 'idle',
+    addedAt: Date.now(),
+  };
 }
 
 // Define ORKG-compliant Red Theme for MUI
@@ -162,16 +179,58 @@ export default function LiveDemo({ onBack }: LiveDemoProps) {
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
   const [showConfig, setShowConfig] = useState(false);
 
-  const initialFile = useMemo<UploadedPdf>(() => ({
-    id: 'empire-compass',
-    name: 'empire-compass.pdf',
-    size: 1_120_998,
-    url: resolvePdfUrl('/empire-compass.pdf'),
-    extractionStatus: 'idle',
-  }), []);
+  const seedFile = useMemo(() => createSeedFile(), []);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([seedFile]);
+  const [activeFileId, setActiveFileId] = useState<string | null>(seedFile.id);
+  const [sessionReady, setSessionReady] = useState(false);
+  const persistReady = useRef(false);
 
-  const [files, setFiles] = useState<UploadedPdf[]>([initialFile]);
-  const [activeFileId, setActiveFileId] = useState<string | null>('empire-compass');
+  // Restore uploaded files from IndexedDB after refresh (blob: URLs do not survive).
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const session = await loadFileSession({ dbName: DEMO_SESSION_DB });
+        if (cancelled) return;
+
+        if (session && session.files.length > 0) {
+          setUploadedFiles(session.files);
+          setActiveFileId(
+            session.activeFileId &&
+              session.files.some((f) => f.id === session.activeFileId)
+              ? session.activeFileId
+              : session.files[0].id
+          );
+        }
+      } catch (err) {
+        console.error('Failed to restore demo file session', err);
+      } finally {
+        if (!cancelled) {
+          persistReady.current = true;
+          setSessionReady(true);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Keep IndexedDB in sync so a refresh restores the latest files / active tab.
+  useEffect(() => {
+    if (!sessionReady || !persistReady.current) return;
+    if (uploadedFiles.length === 0) return;
+    void saveFileSession(
+      {
+        templateId: DEMO_TEMPLATE_ID,
+        activeFileId,
+        files: uploadedFiles,
+      },
+      { dbName: DEMO_SESSION_DB }
+    );
+  }, [uploadedFiles, activeFileId, sessionReady]);
 
   const llmService: LLMService = useMemo(
     () => new OpenRouterLLM(OPENROUTER_API_KEY, selectedModel),
@@ -292,17 +351,33 @@ export default function LiveDemo({ onBack }: LiveDemoProps) {
             )}
 
             <div className="demo-workspace">
+              {!sessionReady ? (
+                <div
+                  style={{
+                    flex: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#64748b',
+                    fontSize: '0.9rem',
+                    fontWeight: 500,
+                  }}
+                >
+                  Restoring files…
+                </div>
+              ) : (
               <ResearchQuestionnaireApp
                 templateSpec={templateSpec}
                 answers={answers}
                 setAnswers={setAnswers}
                 layout="split"
                 showPdfViewer={true}
-                controlledFiles={files}
+                multiModal={true}
+                controlledUploadedFiles={uploadedFiles}
                 controlledActiveFileId={activeFileId}
-                onFilesChange={setFiles}
+                onUploadedFilesChange={setUploadedFiles}
                 onActiveFileIdChange={setActiveFileId}
-                multiple={true}
+                maxFiles={10}
                 questionnaireSlot={(ctx) => <DemoQuestionnaire {...ctx} />}
                 sx={{
                   flex: 1,
@@ -324,17 +399,19 @@ export default function LiveDemo({ onBack }: LiveDemoProps) {
                     minHeight: 0,
                     maxHeight: '100%',
                   },
-                  '& .MuiPaper-outlined > .MuiBox-root:nth-of-type(1)': {
+                  '& .rq-file-manager': {
+                    background: '#fafbfc',
+                  },
+                  '& .rq-questionnaire': {
                     borderRight: '1px solid #e2e8f0',
                     background: '#fff',
                   },
-                  '& .MuiPaper-outlined > .MuiBox-root:nth-of-type(2)': {
-                    width: '5px',
+                  '& .rq-resize-handle': {
                     backgroundColor: '#e2e8f0',
                     transition: 'background-color 0.2s',
                     '&:hover': { backgroundColor: '#EC6160' },
                   },
-                  '& .MuiPaper-outlined > .MuiBox-root:nth-of-type(3)': {
+                  '& .rq-viewer': {
                     background: '#f1f5f9',
                   },
                   '& .MuiTabs-root': {
@@ -400,6 +477,7 @@ export default function LiveDemo({ onBack }: LiveDemoProps) {
                   },
                 }}
               />
+              )}
             </div>
 
           </div>
