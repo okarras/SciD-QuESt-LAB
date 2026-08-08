@@ -3,13 +3,12 @@ import {
   ScidQuestProvider,
   QuestionnaireAIProvider,
   ResearchQuestionnaireApp,
-  loadFileSession,
-  saveFileSession,
 } from '@orkg/scidquest';
 import type { UploadedFile } from '@orkg/scidquest';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
 import { OpenRouterLLM, AVAILABLE_MODELS } from '../services/OpenRouterLLM';
 import type { LLMService, QuestionnaireTemplate } from '@orkg/scidquest';
+import { loadFileSession, saveFileSession } from '../services/demoFileSession';
 import Header from './Header';
 import DemoQuestionnaire from './DemoQuestionnaire';
 
