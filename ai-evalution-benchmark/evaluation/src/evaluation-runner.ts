@@ -19,6 +19,8 @@ import {
   type EvaluationSummary as SimpleEvaluationSummary,
   type Suggestion,
 } from './simple-metrics-calculator';
+import { EvalConfigLoader } from './eval-config-loader';
+import type { EvalConfig } from './eval-config-loader';
 
 import type { ProcessedQuestionInfo } from './question-info-processor';
 
@@ -35,7 +37,7 @@ export interface EvaluationResult {
   questionText: string;
   questionType: string;
   prediction: string;
-  suggestions: Suggestion[]; // All 3 suggestions
+  suggestions: Suggestion[];
   groundTruth: any;
   success: boolean;
   confidence: number;
@@ -100,20 +102,36 @@ export class FrontendExactEvaluationRunner {
   private groundTruthMapper: GroundTruthMapper;
   private siblingContextProvider: SiblingContextProvider;
   private metricsCalculator: SimpleMetricsCalculator;
+  private evalConfig: EvalConfig;
 
   constructor(
     backendUrl: string = 'http://localhost:5001',
-    options: { useBERTScore?: boolean } = {}
+    options: { useBERTScore?: boolean; templatePath?: string } = {}
   ) {
+    // Load template and eval config first
+    this.templateLoader = new FrontendTemplateLoader(options.templatePath);
+    const evalConfigLoader = this.templateLoader.getEvalConfigLoader();
+    this.evalConfig = evalConfigLoader.load();
+
+    // Initialize all components with eval config
     this.pdfExtractor = new FrontendPDFExtractor(backendUrl);
     this.questionProcessor = new FrontendQuestionProcessor();
     this.metadataFormatter = new FrontendPDFMetadataFormatter();
-    this.promptAssembler = new FrontendPromptAssembler();
+    this.promptAssembler = new FrontendPromptAssembler(this.evalConfig);
     this.backendCaller = new FrontendBackendCaller(backendUrl);
-    this.templateLoader = new FrontendTemplateLoader();
-    this.groundTruthMapper = new GroundTruthMapper();
-    this.siblingContextProvider = new SiblingContextProvider();
-    this.metricsCalculator = new SimpleMetricsCalculator(options);
+    this.groundTruthMapper = new GroundTruthMapper(this.evalConfig);
+
+    // Build sibling context provider with dependencies from config + labels from template
+    const allTemplateQuestions = this.templateLoader.getAllQuestions();
+    this.siblingContextProvider = new SiblingContextProvider(
+      this.evalConfig,
+      allTemplateQuestions
+    );
+
+    this.metricsCalculator = new SimpleMetricsCalculator({
+      useBERTScore: options.useBERTScore,
+      evalConfig: this.evalConfig,
+    });
   }
 
   async evaluatePaper(
@@ -445,6 +463,7 @@ export class FrontendExactEvaluationRunner {
     console.log('='.repeat(80));
     console.log('FRONTEND-EXACT EVALUATION RUNNER');
     console.log('='.repeat(80));
+    console.log(`Template: ${this.templateLoader.getTemplatePath()}`);
     console.log(`Dataset: ${datasetPath}`);
     console.log(`Output: ${outputPath}`);
     console.log(`Offset: ${options.offset || 0}`);
@@ -596,6 +615,8 @@ export class FrontendExactEvaluationRunner {
       timestamp: new Date().toISOString(),
       configuration: {
         datasetPath,
+        templatePath: this.templateLoader.getTemplatePath(),
+        templateId: this.evalConfig.template_id,
         offset: options.offset || 0,
         limit: options.limit,
         modelTag: options.modelTag || null,

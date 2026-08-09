@@ -245,23 +245,18 @@ export class FrontendBackendCaller {
     questionId: string,
     prompt: string
   ): string {
-    if (prompt.includes('venue_series') || prompt.includes('venue')) {
-      return 'IEEE International Conference on Software Engineering (ICSE)';
-    }
-    if (prompt.includes('analysis_methods') || prompt.includes('method')) {
-      return 'Statistical analysis, Qualitative coding, Survey methodology';
-    }
-    if (prompt.includes('threats') && prompt.includes('validity')) {
-      return 'Internal validity, External validity, Construct validity';
-    }
+    // Generic mock answer based on question type detected from prompt
     if (prompt.includes('boolean') || prompt.includes('yes/no')) {
-      return 'Yes';
+      return '{"suggestions":[{"rank":1,"text":"yes","confidence":0.5,"evidence":[]},{"rank":2,"text":"no","confidence":0.3,"evidence":[]},{"rank":3,"text":"yes","confidence":0.2,"evidence":[]}]}';
     }
-    if (prompt.includes('multi_select') || prompt.includes('select all')) {
-      return 'Option A, Option B, Option C';
+    if (prompt.includes('Available Options:')) {
+      // Extract first option from prompt
+      const match = prompt.match(/Available Options:\s*([^,\n]+)/);
+      const firstOption = match ? match[1].trim() : 'unknown';
+      return `{"suggestions":[{"rank":1,"text":"${firstOption}","confidence":0.5,"evidence":[]},{"rank":2,"text":"${firstOption}","confidence":0.3,"evidence":[]},{"rank":3,"text":"${firstOption}","confidence":0.2,"evidence":[]}]}`;
     }
 
-    return `Mock response for ${questionId}. This is a demonstration response generated when API keys are not configured.`;
+    return `{"suggestions":[{"rank":1,"text":"Mock response for ${questionId}","confidence":0.5,"evidence":[]},{"rank":2,"text":"Mock response","confidence":0.3,"evidence":[]},{"rank":3,"text":"Mock response","confidence":0.2,"evidence":[]}]}`;
   }
 
   private async makeAPICallWithRawResponse(request: any): Promise<{

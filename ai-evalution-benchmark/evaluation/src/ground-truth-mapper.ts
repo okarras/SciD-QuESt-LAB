@@ -1,10 +1,11 @@
 /**
- * Ground Truth Mapper - Maps questionnaire questions to dataset metadata
+ * Ground Truth Mapper - Generic engine that reads mappings from .eval.json
  *
- * This module maps questions from the frontend questionnaire template
- * to the ground truth answers stored in the dataset metadata.json files.
+ * Instead of hardcoding question ID → metadata path mappings,
+ * this module reads them from the eval config and applies named transforms.
  */
 
+import type { EvalConfig, GroundTruthMappingEntry } from './eval-config-loader';
 import type { EvaluationQuestion } from './evaluation-runner';
 
 const SENTINEL_VALUES = new Set([
@@ -23,35 +24,123 @@ function isSentinelValue(value: any): boolean {
   return SENTINEL_VALUES.has(value.toLowerCase().trim());
 }
 
-export interface GroundTruthMapping {
-  questionId: string;
-  metadataPath: string[];
-  transformer?: (value: any) => any;
-  defaultValue?: any;
-}
+type TransformFn = (value: any, config?: Record<string, any>) => any;
 
-export class GroundTruthMapper {
-  private mappings: GroundTruthMapping[] = [
-    // Context section
-    {
-      questionId: 'doi',
-      metadataPath: ['doi'],
-    },
+const TRANSFORM_REGISTRY: Record<string, TransformFn> = {
+  direct: (value: any) => value,
+  ensure_array: (value: any) => {
+    if (Array.isArray(value)) return value;
+    if (typeof value === 'string') return [value];
+    return [];
+  },
 
-    // Research Paradigm section
-    {
-      questionId: 'research_paradigm',
-      metadataPath: ['questionnaire_data', 'research_paradigm'],
-    },
+  filter_array: (value: any) => {
+    if (!Array.isArray(value)) return [];
+    return value.filter((item: any) => Boolean(item) && !isSentinelValue(String(item)));
+  },
 
-    // Research Questions section
-    {
-      questionId: 'research_questions_list',
-      metadataPath: ['questionnaire_data', 'research_questions'],
-      transformer: (questions: any[]) => {
-        if (!Array.isArray(questions) || questions.length === 0) return [];
-        const firstQuestion = questions[0];
-        if (isSentinelValue(firstQuestion.question)) return [];
+  array_field: (value: any, config?: Record<string, any>) => {
+    if (!Array.isArray(value)) return [];
+    const field = config?.field || 'name';
+    return value
+      .map((item: any) => item?.[field])
+      .filter((v: any) => Boolean(v) && !isSentinelValue(String(v)));
+  },
+
+  array_non_empty_boolean: (value: any) => {
+    if (Array.isArray(value) && value.length > 0) {
+      return 'yes';
+    }
+    return 'no';
+  },
+
+  flags_to_list: (value: any, config?: Record<string, any>) => {
+    if (!value || typeof value !== 'object' || !config) return [];
+    const results: string[] = [];
+    for (const [key, displayName] of Object.entries(config)) {
+      if (value[key] === '1' || value[key] === true) {
+        results.push(displayName as string);
+      }
+    }
+    return results;
+  },
+
+  truthy_to_yes_no: (value: any) => {
+    if (value === true || value === 'true' || value === '1') return 'yes';
+    if (value === false || value === 'false' || value === '0') return 'no';
+    return undefined;
+  },
+
+
+  first_item_field: (value: any, config?: Record<string, any>) => {
+    if (!Array.isArray(value) || value.length === 0) return '';
+    const field = config?.field || 'text';
+    const result = value[0]?.[field] || '';
+    if (isSentinelValue(result)) return '';
+    return result;
+  },
+
+
+  first_item_boolean_field: (value: any, config?: Record<string, any>) => {
+    if (!Array.isArray(value) || value.length === 0) return undefined;
+    const firstItem = value[0];
+    if (!firstItem) return undefined;
+    // Check if the parent item is sentinel
+    if (firstItem.question && isSentinelValue(firstItem.question)) return undefined;
+    const field = config?.field || 'highlighted';
+    const fieldValue = firstItem[field];
+    if (fieldValue === '1' || fieldValue === true) return 'yes';
+    if (fieldValue === '0' || fieldValue === false) return 'no';
+    return undefined;
+  },
+
+  nested_first_item_field: (value: any, config?: Record<string, any>) => {
+    if (!Array.isArray(value) || value.length === 0) return '';
+    const firstItem = value[0];
+    if (!firstItem || isSentinelValue(firstItem?.question)) return '';
+    const nestedField = config?.nested_field || 'subquestions';
+    const field = config?.field || 'text';
+    const nested = firstItem[nestedField];
+    if (!Array.isArray(nested) || nested.length === 0) return '';
+    const result = nested[0]?.[field] || '';
+    if (isSentinelValue(result)) return '';
+    return result;
+  },
+
+
+  join_array_field: (value: any, config?: Record<string, any>) => {
+    if (!Array.isArray(value) || value.length === 0) return '';
+    const field = config?.field || 'text';
+    const separator = config?.separator || ' | ';
+    const items = value
+      .map((item: any) => item?.[field] || '')
+      .filter((v: string) => v && !isSentinelValue(v));
+    return items.length > 0 ? items.join(separator) : '';
+  },
+
+  analysis_methods_aggregate: (value: any) => {
+    const methods: string[] = [];
+    if (value?.descriptive?.length > 0) {
+      methods.push('descriptive statistics');
+    }
+    if (value?.inferential?.length > 0) {
+      methods.push('inferential statistics');
+    }
+    if (value?.machine_learning?.length > 0) {
+      methods.push('machine learning');
+    }
+    return methods;
+  },
+
+
+  custom: (value: any, config?: Record<string, any>) => {
+    const customId = config?.custom_id;
+
+    switch (customId) {
+      case 'research_questions_list': {
+        if (!Array.isArray(value) || value.length === 0) return [];
+        const firstQuestion = value[0];
+        if (isSentinelValue(firstQuestion?.question)) return [];
         return [
           {
             text: firstQuestion.question || '',
@@ -63,418 +152,19 @@ export class GroundTruthMapper {
               firstQuestion.highlighted_answer === true,
           },
         ].filter((q) => q.text.length > 0);
-      },
-    },
+      }
+      default:
+        return value;
+    }
+  },
+};
 
-    // Data Collection section
-    {
-      questionId: 'data_collection_methods',
-      metadataPath: ['questionnaire_data', 'data_collection', 'methods'],
-      transformer: (methods: any[]) => {
-        if (!Array.isArray(methods)) return [];
-        return methods
-          .map((m) => m.name)
-          .filter((n) => Boolean(n) && !isSentinelValue(n));
-      },
-    },
+export class GroundTruthMapper {
+  private evalConfig: EvalConfig;
 
-    {
-      questionId: 'data_type',
-      metadataPath: ['questionnaire_data', 'data_collection', 'data_type'],
-      transformer: (dataType: any) => {
-        if (Array.isArray(dataType)) return dataType;
-        if (typeof dataType === 'string') return [dataType];
-        return [];
-      },
-    },
-
-    // Data Analysis section
-    {
-      questionId: 'analysis_methods',
-      metadataPath: ['questionnaire_data', 'data_analysis'],
-      transformer: (analysis: any) => {
-        const methods: string[] = [];
-        if (analysis?.descriptive?.length > 0) {
-          methods.push('descriptive statistics');
-        }
-        if (analysis?.inferential?.length > 0) {
-          methods.push('inferential statistics');
-        }
-        if (analysis?.machine_learning?.length > 0) {
-          methods.push('machine learning');
-        }
-        return methods;
-      },
-    },
-
-    {
-      questionId: 'descriptive_stats_used',
-      metadataPath: ['questionnaire_data', 'data_analysis', 'descriptive'],
-      transformer: (descriptive: any[]) => {
-        if (Array.isArray(descriptive) && descriptive.length > 0) {
-          return 'yes';
-        }
-        return 'no';
-      },
-    },
-
-    {
-      questionId: 'measures_frequency',
-      metadataPath: [
-        'questionnaire_data',
-        'data_analysis',
-        'descriptive_measures',
-        'frequency',
-      ],
-      transformer: (measures: any) => {
-        if (!Array.isArray(measures)) return [];
-        return measures.filter(Boolean);
-      },
-    },
-
-    {
-      questionId: 'measures_central',
-      metadataPath: [
-        'questionnaire_data',
-        'data_analysis',
-        'descriptive_measures',
-        'central_tendency',
-      ],
-      transformer: (measures: any) => {
-        if (!Array.isArray(measures)) return [];
-        return measures.filter(Boolean);
-      },
-    },
-
-    {
-      questionId: 'measures_dispersion',
-      metadataPath: [
-        'questionnaire_data',
-        'data_analysis',
-        'descriptive_measures',
-        'dispersion',
-      ],
-      transformer: (measures: any) => {
-        if (!Array.isArray(measures)) return [];
-        return measures.filter(Boolean);
-      },
-    },
-
-    {
-      questionId: 'measures_position',
-      metadataPath: [
-        'questionnaire_data',
-        'data_analysis',
-        'descriptive_measures',
-        'position',
-      ],
-      transformer: (measures: any) => {
-        if (!Array.isArray(measures)) return [];
-        return measures.filter(Boolean);
-      },
-    },
-
-    {
-      questionId: 'inferential_stats_used',
-      metadataPath: ['questionnaire_data', 'data_analysis', 'inferential'],
-      transformer: (inferential: any[]) => {
-        if (Array.isArray(inferential) && inferential.length > 0) {
-          return 'yes';
-        }
-        return 'no';
-      },
-    },
-
-    {
-      questionId: 'statistical_tests',
-      metadataPath: [
-        'questionnaire_data',
-        'data_analysis',
-        'statistical_tests',
-      ],
-      transformer: (tests: any) => {
-        if (!Array.isArray(tests) || tests.length === 0) return [];
-        const valid = tests.filter(
-          (t: any) => t && !isSentinelValue(String(t))
-        );
-        return valid.length > 0 ? valid : [];
-      },
-    },
-
-    {
-      questionId: 'ml_used',
-      metadataPath: ['questionnaire_data', 'data_analysis', 'machine_learning'],
-      transformer: (ml: any[]) => {
-        if (Array.isArray(ml) && ml.length > 0) {
-          return 'yes';
-        }
-        return 'no';
-      },
-    },
-
-    {
-      questionId: 'ml_algorithms',
-      metadataPath: ['questionnaire_data', 'data_analysis', 'ml_algorithms'],
-      transformer: (algorithms: any) => {
-        if (!Array.isArray(algorithms) || algorithms.length === 0) return [];
-        const valid = algorithms.filter(
-          (a: any) => a && !isSentinelValue(String(a))
-        );
-        return valid.length > 0 ? valid : [];
-      },
-    },
-
-    {
-      questionId: 'ml_metrics',
-      metadataPath: ['questionnaire_data', 'data_analysis', 'ml_metrics'],
-      transformer: (metrics: any) => {
-        if (!Array.isArray(metrics)) return [];
-        return metrics.filter(Boolean);
-      },
-    },
-
-    {
-      questionId: 'other_analysis_used',
-      metadataPath: ['questionnaire_data', 'data_analysis', 'other_methods'],
-      transformer: (other: any[]) => {
-        if (!Array.isArray(other) || other.length === 0) {
-          return 'no';
-        }
-        const real = other.filter(
-          (m) => Boolean(m) && !isSentinelValue(String(m))
-        );
-        if (real.length === 0) return 'no';
-        return 'yes';
-      },
-    },
-
-    {
-      questionId: 'other_analysis_methods',
-      metadataPath: ['questionnaire_data', 'data_analysis', 'other_methods'],
-      transformer: (methods: any) => {
-        if (!Array.isArray(methods) || methods.length === 0) return [];
-        const valid = methods.filter(
-          (m: any) => m && !isSentinelValue(String(m))
-        );
-        return valid.length > 0 ? valid : [];
-      },
-    },
-
-    // Threats to Validity section
-    {
-      questionId: 'threats_reported',
-      metadataPath: ['questionnaire_data', 'threats_to_validity'],
-      transformer: (threats: any) => {
-        const reportedThreats: string[] = [];
-
-        if (threats?.external === '1')
-          reportedThreats.push('external validity');
-        if (threats?.internal === '1')
-          reportedThreats.push('internal validity');
-        if (threats?.construct === '1')
-          reportedThreats.push('construct validity');
-        if (threats?.conclusion === '1')
-          reportedThreats.push('conclusion validity');
-        if (threats?.reliability === '1') reportedThreats.push('reliability');
-        if (threats?.generalizability === '1')
-          reportedThreats.push('generalizability');
-        if (threats?.repeatability === '1')
-          reportedThreats.push('repeatability');
-        if (threats?.content_validity === '1')
-          reportedThreats.push('content validity');
-        if (threats?.descriptive_validity === '1')
-          reportedThreats.push('descriptive validity');
-        if (threats?.theoretical_validity === '1')
-          reportedThreats.push('theoretical validity');
-
-        return reportedThreats;
-      },
-    },
-
-    {
-      questionId: 'threats_mentioned_uncategorized',
-      metadataPath: [
-        'questionnaire_data',
-        'threats_to_validity',
-        'mentioned_uncategorized',
-      ],
-      transformer: (mentioned: any) => {
-        if (mentioned === '1' || mentioned === true) {
-          return 'yes';
-        }
-        return 'no';
-      },
-    },
-
-    // Answer highlighting questions — stored as top-level booleans in questionnaire_data
-    {
-      questionId: 'answer_highlighted',
-      metadataPath: ['questionnaire_data', 'answer_highlighted'],
-      transformer: (value: any) => {
-        if (value === true || value === 'true' || value === '1') return 'yes';
-        if (value === false || value === 'false' || value === '0') return 'no';
-        return undefined;
-      },
-    },
-
-    {
-      questionId: 'answer_hidden',
-      metadataPath: ['questionnaire_data', 'answer_hidden'],
-      transformer: (value: any) => {
-        if (value === true || value === 'true' || value === '1') return 'yes';
-        if (value === false || value === 'false' || value === '0') return 'no';
-        return undefined;
-      },
-    },
-
-    // Questions inside research_data group
-    {
-      questionId: 'data_urls',
-      metadataPath: ['questionnaire_data', 'data_collection', 'data_urls'],
-      transformer: (urls: any) => {
-        if (!Array.isArray(urls) || urls.length === 0) return [];
-        const valid = urls.filter((u: any) => u && String(u).trim());
-        return valid.length > 0 ? valid : [];
-      },
-    },
-
-    // Questions inside research_questions_list repeat_group
-    {
-      questionId: 'rq_text',
-      metadataPath: ['questionnaire_data', 'research_questions'],
-      transformer: (questions: any[]) => {
-        if (!Array.isArray(questions) || questions.length === 0) return '';
-        const q = questions[0]?.question || '';
-        if (isSentinelValue(q)) return '';
-        return q;
-      },
-    },
-
-    {
-      questionId: 'rq_highlighted',
-      metadataPath: ['questionnaire_data', 'research_questions'],
-      transformer: (questions: any[]) => {
-        if (!Array.isArray(questions) || questions.length === 0)
-          return undefined;
-        const firstQuestion = questions[0];
-        if (!firstQuestion?.question || isSentinelValue(firstQuestion.question))
-          return undefined;
-        return (
-          firstQuestion.highlighted_question === '1' ||
-          firstQuestion.highlighted_question === true
-        );
-      },
-    },
-
-    {
-      questionId: 'rq_hidden',
-      metadataPath: ['questionnaire_data', 'research_questions'],
-      transformer: (questions: any[]) => {
-        if (!Array.isArray(questions) || questions.length === 0)
-          return undefined;
-        const firstQuestion = questions[0];
-        if (!firstQuestion?.question || isSentinelValue(firstQuestion.question))
-          return undefined;
-        return firstQuestion.hidden === '1' || firstQuestion.hidden === true;
-      },
-    },
-
-    {
-      questionId: 'rq_type',
-      metadataPath: ['questionnaire_data', 'research_questions'],
-      transformer: (questions: any[]) => {
-        if (!Array.isArray(questions) || questions.length === 0) return '';
-        const t = questions[0]?.type || '';
-        if (isSentinelValue(t)) return '';
-        return t;
-      },
-    },
-
-    // Questions inside subquestions repeat_group (nested inside research_questions_list)
-    {
-      questionId: 'subq_text',
-      metadataPath: ['questionnaire_data', 'research_questions'],
-      transformer: (questions: any[]) => {
-        if (!Array.isArray(questions) || questions.length === 0) return '';
-        const firstQuestion = questions[0];
-        if (isSentinelValue(firstQuestion?.question)) return '';
-        if (
-          Array.isArray(firstQuestion?.subquestions) &&
-          firstQuestion.subquestions.length > 0
-        ) {
-          return firstQuestion.subquestions[0]?.question || '';
-        }
-        return '';
-      },
-    },
-
-    {
-      questionId: 'subq_type',
-      metadataPath: ['questionnaire_data', 'research_questions'],
-      transformer: (questions: any[]) => {
-        if (!Array.isArray(questions) || questions.length === 0) return '';
-        const firstQuestion = questions[0];
-        if (isSentinelValue(firstQuestion?.question)) return '';
-        if (
-          Array.isArray(firstQuestion?.subquestions) &&
-          firstQuestion.subquestions.length > 0
-        ) {
-          const t = firstQuestion.subquestions[0]?.type || '';
-          if (isSentinelValue(t)) return '';
-          return t;
-        }
-        return '';
-      },
-    },
-
-    // Questions inside data_collection_methods repeat_group
-    {
-      questionId: 'method_type',
-      metadataPath: ['questionnaire_data', 'data_collection', 'methods'],
-      transformer: (methods: any[]) => {
-        if (!Array.isArray(methods) || methods.length === 0) return '';
-        const t = methods[0]?.type || '';
-        if (isSentinelValue(t)) return '';
-        return t;
-      },
-    },
-
-    {
-      questionId: 'method_name_custom',
-      metadataPath: ['questionnaire_data', 'data_collection', 'methods'],
-      transformer: (methods: any[]) => {
-        if (!Array.isArray(methods) || methods.length === 0) return '';
-        const n = methods[0]?.name || '';
-        if (isSentinelValue(n)) return '';
-        return n;
-      },
-    },
-
-    // Questions inside hypotheses repeat_group
-    {
-      questionId: 'hypothesis_statement',
-      metadataPath: ['questionnaire_data', 'data_analysis', 'hypotheses'],
-      transformer: (hypotheses: any[]) => {
-        if (!Array.isArray(hypotheses) || hypotheses.length === 0) return '';
-        const statements = hypotheses
-          .map((h) => h?.statement || '')
-          .filter((s) => s && !isSentinelValue(s));
-        return statements.length > 0 ? statements.join(' | ') : '';
-      },
-    },
-
-    {
-      questionId: 'hypothesis_type',
-      metadataPath: ['questionnaire_data', 'data_analysis', 'hypotheses'],
-      transformer: (hypotheses: any[]) => {
-        if (!Array.isArray(hypotheses) || hypotheses.length === 0) return '';
-        const types = hypotheses
-          .map((h) => h?.type || '')
-          .filter((t) => t && !isSentinelValue(t));
-        return types.length > 0 ? types.join(' | ') : '';
-      },
-    },
-  ];
+  constructor(evalConfig: EvalConfig) {
+    this.evalConfig = evalConfig;
+  }
 
   /**
    * Map questions to their ground truth values from metadata
@@ -483,10 +173,11 @@ export class GroundTruthMapper {
     questions: EvaluationQuestion[],
     metadata: any
   ): EvaluationQuestion[] {
+    const mappings = this.evalConfig.ground_truth_mappings;
     const mappedQuestions: EvaluationQuestion[] = [];
 
     for (const question of questions) {
-      const mapping = this.mappings.find((m) => m.questionId === question.id);
+      const mapping = mappings[question.id];
 
       if (!mapping) {
         console.log(
@@ -495,7 +186,7 @@ export class GroundTruthMapper {
         continue;
       }
 
-      const groundTruth = this.extractValueFromMetadata(metadata, mapping);
+      const groundTruth = this.extractAndTransform(metadata, mapping);
 
       if (this.hasValidGroundTruth(groundTruth)) {
         mappedQuestions.push({
@@ -513,16 +204,13 @@ export class GroundTruthMapper {
     return mappedQuestions;
   }
 
-  /**
-   * Extract value from metadata using a path
-   */
-  private extractValueFromMetadata(
+  private extractAndTransform(
     metadata: any,
-    mapping: GroundTruthMapping
+    mapping: GroundTruthMappingEntry
   ): any {
+    // Navigate the metadata path
     let value = metadata;
-
-    for (const key of mapping.metadataPath) {
+    for (const key of mapping.path) {
       if (value && typeof value === 'object' && key in value) {
         value = value[key];
       } else {
@@ -531,16 +219,28 @@ export class GroundTruthMapper {
       }
     }
 
-    if (value !== undefined && mapping.transformer) {
-      try {
-        value = mapping.transformer(value);
-      } catch (error) {
-        console.warn(`Transformer failed for ${mapping.questionId}:`, error);
-        value = undefined;
-      }
+    if (value === undefined) {
+      return undefined;
     }
 
-    return value;
+    // Apply the named transform
+    const transformFn = TRANSFORM_REGISTRY[mapping.transform];
+    if (!transformFn) {
+      console.warn(
+        `Unknown transform "${mapping.transform}" — returning raw value`
+      );
+      return value;
+    }
+
+    try {
+      return transformFn(value, mapping.config);
+    } catch (error) {
+      console.warn(
+        `Transform "${mapping.transform}" failed:`,
+        error instanceof Error ? error.message : String(error)
+      );
+      return undefined;
+    }
   }
 
   private hasValidGroundTruth(groundTruth: any): boolean {
@@ -569,3 +269,6 @@ export class GroundTruthMapper {
     return true;
   }
 }
+
+export { TRANSFORM_REGISTRY };
+export type { TransformFn };

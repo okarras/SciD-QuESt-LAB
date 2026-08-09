@@ -1,12 +1,13 @@
 /**
- * Prompt Assembler - Uses EXACT frontend prompt generation logic
+ * Prompt Assembler - Assembles prompts using config from .eval.json
  *
- * This module assembles prompts exactly the same way as the frontend
- * backendAIService.generateSuggestions method to ensure 100% identical prompts.
+ * System prompt, temperature, and max tokens are now read from the eval config
+ * instead of being hardcoded constants.
  */
 
 import type { ProcessedQuestionInfo } from './question-info-processor';
 import type { FormattedPDFMetadata } from './pdf-metadata-formatter';
+import type { EvalConfig } from './eval-config-loader';
 
 export interface AssembledPrompt {
   systemPrompt: string;
@@ -24,8 +25,8 @@ export interface AssembledPrompt {
   };
 }
 
-export class FrontendPromptAssembler {
-  private readonly SYSTEM_PROMPT = `You are an AI assistant helping researchers extract information from academic papers.
+// Default system prompt used when no eval config is provided
+const DEFAULT_SYSTEM_PROMPT = `You are an AI assistant helping researchers extract information from academic papers.
 Your task is to analyze the provided PDF content and suggest answers to specific questions.
 
 The PDF content is organized by chunks and pages (e.g., [PAGE 1], [PAGE 3], [PAGE 4]).
@@ -62,6 +63,23 @@ Generate exactly 3 suggestions in the following JSON format:
   ]
 }`;
 
+export class FrontendPromptAssembler {
+  private systemPrompt: string;
+  private defaultTemperature: number;
+  private defaultMaxTokens: number;
+
+  constructor(evalConfig?: EvalConfig) {
+    if (evalConfig) {
+      this.systemPrompt = evalConfig.evaluation.system_prompt;
+      this.defaultTemperature = evalConfig.evaluation.temperature;
+      this.defaultMaxTokens = evalConfig.evaluation.max_tokens;
+    } else {
+      this.systemPrompt = DEFAULT_SYSTEM_PROMPT;
+      this.defaultTemperature = 0.3;
+      this.defaultMaxTokens = 2000;
+    }
+  }
+
   assemblePrompt(
     questionInfo: ProcessedQuestionInfo,
     pdfMetadata: FormattedPDFMetadata,
@@ -75,7 +93,7 @@ Generate exactly 3 suggestions in the following JSON format:
       throw new Error('PDF content is required');
     }
 
-    const systemPrompt = this.SYSTEM_PROMPT;
+    const systemPrompt = this.systemPrompt;
 
     const userPrompt = this.buildUserPrompt(
       questionInfo,
@@ -83,16 +101,13 @@ Generate exactly 3 suggestions in the following JSON format:
       pdfContent
     );
 
-    const temperature = 0.3;
-    const maxTokens = 2000;
-
     const promptLength = systemPrompt.length + userPrompt.length;
 
     return {
       systemPrompt,
       userPrompt,
-      temperature,
-      maxTokens,
+      temperature: this.defaultTemperature,
+      maxTokens: this.defaultMaxTokens,
       metadata: {
         promptLength,
         systemPromptLength: systemPrompt.length,
@@ -137,8 +152,7 @@ ${instructionsSection}`;
   }
 
   /**
-   * Assemble prompt without feedback/context (for evaluation)
-   * This is the simplified version for testing without user feedback
+   * Assemble prompt for evaluation (with optional sibling context)
    */
   assembleEvaluationPrompt(
     questionInfo: ProcessedQuestionInfo,
@@ -166,7 +180,7 @@ ${instructionsSection}`;
     pdfContent: string,
     siblingContextSection: string
   ): AssembledPrompt {
-    const systemPrompt = this.SYSTEM_PROMPT;
+    const systemPrompt = this.systemPrompt;
     const metadataSection = pdfMetadata.metadataText;
 
     let questionSection = `Question: ${questionInfo.questionText}\n`;
@@ -195,8 +209,8 @@ ${instructionsSection}`;
     return {
       systemPrompt,
       userPrompt,
-      temperature: 0.3,
-      maxTokens: 2000,
+      temperature: this.defaultTemperature,
+      maxTokens: this.defaultMaxTokens,
       metadata: {
         promptLength,
         systemPromptLength: systemPrompt.length,

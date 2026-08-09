@@ -10,6 +10,7 @@ import { FrontendExactEvaluationRunner } from './evaluation-runner';
 interface CLIOptions {
   dataset: string;
   output: string;
+  template?: string;
   limit?: number;
   offset?: number;
   backend?: string;
@@ -36,6 +37,9 @@ function parseArgs(): CLIOptions {
         break;
       case '--output':
         options.output = args[++i];
+        break;
+      case '--template':
+        options.template = args[++i];
         break;
       case '--limit':
         options.limit = parseInt(args[++i]);
@@ -83,30 +87,46 @@ Frontend-Exact Evaluation Runner
 Usage: node dist/index.js [options]
 
 Options:
-  --dataset <path>    Path to dataset directory (default: ../../dataset)
-  --output <path>     Output file path (default: auto-generated with model tag)
-  --limit <number>    Limit number of papers to evaluate
-  --offset <number>   Skip first N papers (for slab-based evaluation)
-  --model <name>      Override AI model (e.g., gpt-4o-mini, gpt-3.5-turbo)
-  --model-tag <tag>   Tag for output file naming and result tracking
-  --with-context      Include sibling ground truth as context (simulates real app)
-  --backend <url>     Backend service URL (default: http://localhost:5001)
-  --test              Test backend connectivity only
-  --help              Show this help message
+  --dataset <path>      Path to dataset directory (default: ../dataset)
+  --output <path>       Output file path (default: auto-generated with model tag)
+  --template <path>     Path to questionnaire template JSON file
+                        (default: templates/empirical_research_questionaire.json)
+                        A companion .eval.json file must exist alongside the template.
+  --limit <number>      Limit number of papers to evaluate
+  --offset <number>     Skip first N papers (for slab-based evaluation)
+  --model <name>        Override AI model (e.g., gpt-4o-mini, gpt-3.5-turbo)
+  --model-tag <tag>     Tag for output file naming and result tracking
+  --with-context        Include sibling ground truth as context (simulates real app)
+  --backend <url>       Backend service URL (default: http://localhost:5001)
+  --skip-existing       Skip questions already evaluated in existing output file
+  --only-questions <ids> Comma-separated list of question IDs to evaluate
+  --test                Test backend connectivity only
+  --help                Show this help message
+
+Template System:
+  Each template requires a companion evaluation config file:
+    templates/my_template.json       ← questionnaire structure
+    templates/my_template.eval.json  ← evaluation config (metrics, mappings, etc.)
+
+  The eval config defines:
+    - Ground truth mappings (how to extract answers from dataset metadata)
+    - Metric thresholds (what counts as "correct" per question type)
+    - Sibling dependencies (context injection between questions)
+    - System prompt and AI parameters
+    - Question skip lists
 
 Examples:
   # Test backend connectivity
   node dist/index.js --test
 
-  # Evaluate first 75 papers (10% slab) with gpt-3.5-turbo
-  node dist/index.js --limit 75 --model gpt-3.5-turbo --model-tag gpt35
-
-  # Same slab with gpt-4o-mini for comparison
+  # Evaluate with default template
   node dist/index.js --limit 75 --model gpt-4o-mini --model-tag gpt4omini
+
+  # Evaluate with a custom template
+  node dist/index.js --template ./templates/my_custom_template.json --limit 10
 
   # Next slab (papers 75-150)
   node dist/index.js --offset 75 --limit 75 --model gpt-3.5-turbo --model-tag gpt35
-
 
 Requirements:
   - Backend service running (default: http://localhost:5001)
@@ -139,8 +159,15 @@ async function main() {
 
     const useBERTScore = process.env.USE_BERTSCORE === 'true';
 
+    // Resolve template path
+    let templatePath: string | undefined;
+    if (options.template) {
+      templatePath = path.resolve(options.template);
+    }
+
     const runner = new FrontendExactEvaluationRunner(options.backend, {
       useBERTScore,
+      templatePath,
     });
 
     if (options.test) {
@@ -172,6 +199,7 @@ async function main() {
     console.log('Starting frontend-exact evaluation...');
     console.log(`Dataset: ${options.dataset}`);
     console.log(`Output: ${options.output}`);
+    console.log(`Template: ${templatePath || '(default)'}`);
     console.log(`Backend: ${options.backend || 'http://localhost:5001'}`);
     console.log(`Model: ${options.model || 'from .env'}`);
     console.log(

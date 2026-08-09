@@ -1,10 +1,9 @@
 /**
- * Frontend PDF Extractor - Node.js compatible version of frontend structuredPdfExtractor
+ * Frontend PDF Extractor - Uses pdfjs-dist for reliable text extraction
  */
 
 import * as fs from 'fs';
 import * as path from 'path';
-const PDFParser = require('pdf2json');
 
 export interface PageContent {
   pageNumber: number;
@@ -38,124 +37,84 @@ function estimateTokens(text: string): number {
 export class FrontendStructuredPDFExtractor {
   private documentCache: Map<string, StructuredDocument> = new Map();
 
+  private pdfjsLib: any = null;
+
+  private getPdfjsLib(): any {
+    if (!this.pdfjsLib) {
+      // pdfjs-dist v3 legacy build works in Node.js CJS
+      this.pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
+    }
+    return this.pdfjsLib;
+  }
+
   private async parsePDFFile(pdfPath: string): Promise<{
     fullText: string;
     pages: PageContent[];
     numPages: number;
   }> {
-    return new Promise((resolve, reject) => {
-      const pdfParser = new PDFParser();
+    const pdfjsLib = this.getPdfjsLib();
 
-      pdfParser.on('pdfParser_dataError', (errData: any) => {
-        reject(new Error(`PDF parsing error: ${errData.parserError}`));
-      });
+    const standardFontDataUrl = path.resolve(
+      __dirname,
+      '../node_modules/pdfjs-dist/standard_fonts/'
+    ) + '/';
+    const data = new Uint8Array(fs.readFileSync(pdfPath));
+    const doc = await pdfjsLib.getDocument({ data, standardFontDataUrl }).promise;
 
-      pdfParser.on('pdfParser_dataReady', (pdfData: any) => {
-        try {
-          const pages: PageContent[] = [];
-          let fullText = '';
+    const pages: PageContent[] = [];
+    let fullText = '';
 
-          if (pdfData.Pages && Array.isArray(pdfData.Pages)) {
-            for (
-              let pageIndex = 0;
-              pageIndex < pdfData.Pages.length;
-              pageIndex++
-            ) {
-              const page = pdfData.Pages[pageIndex];
-              let pageText = '';
+    for (let i = 1; i <= doc.numPages; i++) {
+      const page = await doc.getPage(i);
+      const content = await page.getTextContent();
 
-              if (page.Texts && Array.isArray(page.Texts)) {
-                const textItems = page.Texts.map(
-                  (textItem: any, index: number) => {
-                    let text = '';
-                    if (textItem.R && Array.isArray(textItem.R)) {
-                      for (const run of textItem.R) {
-                        if (run.T) {
-                          text += decodeURIComponent(run.T) + ' ';
-                        }
-                      }
-                    }
-                    return {
-                      text: text.trim(),
-                      y: textItem.y || 0,
-                      x: textItem.x || 0,
-                      index,
-                    };
-                  }
-                ).filter((item: any) => item.text.length > 0);
+      let pageText = content.items
+        .map((item: any) => item.str)
+        .join(' ');
 
-                textItems.sort((a: any, b: any) => {
-                  if (Math.abs(a.y - b.y) > 0.1) {
-                    return b.y - a.y;
-                  }
-                  return a.x - b.x;
-                });
+      pageText = pageText
+        .replace(/[ \t]+/g, ' ')
+        .replace(/\n\s+/g, '\n')
+        .replace(/\s+\n/g, '\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
 
-                const filteredItems = textItems.filter((item: any) => {
-                  const text = item.text.toLowerCase();
-                  if (
-                    text.includes('authorized licensed use') ||
-                    text.includes('downloaded on') ||
-                    text.includes('restrictions apply') ||
-                    text.includes('ieee xplore') ||
-                    text.includes('technische informationsbibliothek') ||
-                    text.includes('tib') ||
-                    text.match(/^\d+\s+\d+$/) ||
-                    text.match(/^20\d{2}\s+ieee/) ||
-                    text.match(/^\d{4}-\d{4}\/\d{2}/) ||
-                    text.match(/^doi\s*10\./) ||
-                    text.includes('$31.00') ||
-                    (text.length < 10 && text.match(/^\d+$/))
-                  ) {
-                    return false;
-                  }
-                  return true;
-                });
-
-                pageText = filteredItems
-                  .map((item: any) => item.text)
-                  .join(' ');
-              }
-
-              pageText = pageText
-                .replace(/[ \t]+/g, ' ')
-                .replace(/\n\s+/g, '\n')
-                .replace(/\s+\n/g, '\n')
-                .replace(/\n{3,}/g, '\n\n')
-                .trim();
-
-              const wordCount = pageText
-                .split(/\s+/)
-                .filter((word) => word.length > 0).length;
-
-              pages.push({
-                pageNumber: pageIndex + 1,
-                text: pageText,
-                wordCount,
-              });
-
-              fullText += pageText + '\n\n';
-            }
-          }
-
-          fullText = fullText.trim();
-
-          resolve({
-            fullText,
-            pages,
-            numPages: pdfData.Pages ? pdfData.Pages.length : 0,
-          });
-        } catch (error) {
-          reject(
-            new Error(
-              `Error processing PDF data: ${error instanceof Error ? error.message : String(error)}`
-            )
-          );
+      const lines = pageText.split(/\n/);
+      const filteredLines = lines.filter((line: string) => {
+        const lower = line.toLowerCase().trim();
+        if (lower.length > 200) return true;
+        if (
+          lower.includes('authorized licensed use') ||
+          (lower.includes('downloaded on') && lower.includes('from ieee xplore')) ||
+          (lower.includes('restrictions apply') && lower.length < 50) ||
+          (lower.includes('technische informationsbibliothek') && lower.length < 150)
+        ) {
+          return false;
         }
+        return true;
+      });
+      pageText = filteredLines.join('\n').trim();
+
+      const wordCount = pageText
+        .split(/\s+/)
+        .filter((word: string) => word.length > 0).length;
+
+      pages.push({
+        pageNumber: i,
+        text: pageText,
+        wordCount,
       });
 
-      pdfParser.loadPDF(pdfPath);
-    });
+      fullText += pageText + '\n\n';
+    }
+
+    fullText = fullText.trim();
+
+    return {
+      fullText,
+      pages,
+      numPages: doc.numPages,
+    };
   }
 
   async extractStructuredDocument(
