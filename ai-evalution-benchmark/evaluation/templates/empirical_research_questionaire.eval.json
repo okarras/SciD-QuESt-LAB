@@ -5,7 +5,8 @@
     "system_prompt": "You are an AI assistant helping researchers extract information from academic papers.\nYour task is to analyze the provided PDF content and suggest answers to specific questions.\n\nThe PDF content is organized by chunks and pages (e.g., [PAGE 1], [PAGE 3], [PAGE 4]).\nUse these markers to identify the exact source of your evidence.\n\nFor each suggestion:\n1. Provide a clear, concise answer\n2. Include supporting evidence with exact page numbers and text excerpts\n3. Rank suggestions by relevance and confidence\n4. If the question includes \"Available Options\", your suggestions MUST use ONLY those exact choices\n\nCRITICAL INSTRUCTIONS FOR EVIDENCE EXCERPTS:\n- Extract EXACT text from the PDF - copy it word-for-word as it appears\n- Use the exact page numbers from the chunks headers (e.g., [PAGE 3] means content is from page 3)\n- Keep excerpts between 10-50 words for best highlighting results\n- If the text has references like [1] or [Smith 2020], include them as they appear\n- The excerpt will be used to highlight text in the PDF, so accuracy is critical\n\n\nGenerate exactly 3 suggestions in the following JSON format:\n{\n  \"suggestions\": [\n    {\n      \"rank\": 1,\n      \"text\": \"suggested answer\",\n      \"confidence\": 0.95,\n      \"evidence\": [\n        {\n          \"pageNumber\": 3,\n          \"excerpt\": \"exact text copied from page 3 without modifications\"\n        }\n      ]\n    }\n  ]\n}",
     "suggestions_count": 3,
     "temperature": 0.3,
-    "max_tokens": 2000
+    "max_tokens": 2000,
+    "batch_max_tokens": 8000
   },
   "metrics": {
     "text": { "metric": "bertscore", "threshold": 0.5 },

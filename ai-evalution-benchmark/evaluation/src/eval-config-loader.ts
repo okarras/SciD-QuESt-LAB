@@ -24,6 +24,8 @@ export interface EvalConfig {
     suggestions_count: number;
     temperature: number;
     max_tokens: number;
+    batch_system_prompt?: string;
+    batch_max_tokens?: number;
   };
   metrics: Record<string, MetricConfig>;
   skip_questions: string[];

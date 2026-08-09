@@ -6,11 +6,13 @@ import * as path from 'path';
 dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 import { FrontendExactEvaluationRunner } from './evaluation-runner';
+import { BatchEvaluationRunner } from './batch-evaluation-runner';
 
 interface CLIOptions {
   dataset: string;
   output: string;
   template?: string;
+  mode?: 'per-question' | 'batch';
   limit?: number;
   offset?: number;
   backend?: string;
@@ -40,6 +42,9 @@ function parseArgs(): CLIOptions {
         break;
       case '--template':
         options.template = args[++i];
+        break;
+      case '--mode':
+        options.mode = args[++i] as 'per-question' | 'batch';
         break;
       case '--limit':
         options.limit = parseInt(args[++i]);
@@ -92,6 +97,9 @@ Options:
   --template <path>     Path to questionnaire template JSON file
                         (default: templates/empirical_research_questionaire.json)
                         A companion .eval.json file must exist alongside the template.
+  --mode <mode>         Evaluation mode: "per-question" (default) or "batch"
+                        per-question: one LLM call per question (uses semantic chunking)
+                        batch: one LLM call per paper with all questions at once
   --limit <number>      Limit number of papers to evaluate
   --offset <number>     Skip first N papers (for slab-based evaluation)
   --model <name>        Override AI model (e.g., gpt-4o-mini, gpt-3.5-turbo)
@@ -200,6 +208,7 @@ async function main() {
     console.log(`Dataset: ${options.dataset}`);
     console.log(`Output: ${options.output}`);
     console.log(`Template: ${templatePath || '(default)'}`);
+    console.log(`Mode: ${options.mode || 'per-question'}`);
     console.log(`Backend: ${options.backend || 'http://localhost:5001'}`);
     console.log(`Model: ${options.model || 'from .env'}`);
     console.log(
@@ -215,6 +224,39 @@ async function main() {
     if (options.modelTag) {
       console.log(`Model Tag: ${options.modelTag}`);
     }
+
+    // Batch mode
+    if (options.mode === 'batch') {
+      console.log(`\nRunning in BATCH mode (single LLM call per paper)\n`);
+
+      const batchRunner = new BatchEvaluationRunner(options.backend, {
+        useBERTScore,
+        templatePath,
+      });
+
+      const summary = await batchRunner.runBatchEvaluation(
+        options.dataset,
+        options.output,
+        {
+          limit: options.limit,
+          offset: options.offset,
+          modelTag: options.modelTag || options.model,
+          backendUrl: options.backend,
+          onlyQuestions: options.onlyQuestions,
+        }
+      );
+
+      console.log('\nBatch evaluation completed!');
+      console.log(
+        `Papers: ${summary.successfulPapers}/${summary.totalPapers} successful`
+      );
+      console.log(
+        `Questions: ${summary.successfulQuestions}/${summary.totalQuestions} successful`
+      );
+      process.exit(0);
+    }
+
+    // Per-question mode (default)
     console.log(
       `Sibling Context: ${options.withContext ? 'enabled' : 'disabled'}`
     );
