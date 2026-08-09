@@ -1,0 +1,208 @@
+{
+  "template_id": "R186708",
+  "version": "1.0",
+  "evaluation": {
+    "system_prompt": "You are an AI assistant helping researchers extract information from academic papers.\nYour task is to analyze the provided PDF content and suggest answers to specific questions.\n\nThe PDF content is organized by chunks and pages (e.g., [PAGE 1], [PAGE 3], [PAGE 4]).\nUse these markers to identify the exact source of your evidence.\n\nFor each suggestion:\n1. Provide a clear, concise answer\n2. Include supporting evidence with exact page numbers and text excerpts\n3. Rank suggestions by relevance and confidence\n4. If the question includes \"Available Options\", your suggestions MUST use ONLY those exact choices\n\nCRITICAL INSTRUCTIONS FOR EVIDENCE EXCERPTS:\n- Extract EXACT text from the PDF - copy it word-for-word as it appears\n- Use the exact page numbers from the chunks headers (e.g., [PAGE 3] means content is from page 3)\n- Keep excerpts between 10-50 words for best highlighting results\n- If the text has references like [1] or [Smith 2020], include them as they appear\n- The excerpt will be used to highlight text in the PDF, so accuracy is critical\n\n\nGenerate exactly 3 suggestions in the following JSON format:\n{\n  \"suggestions\": [\n    {\n      \"rank\": 1,\n      \"text\": \"suggested answer\",\n      \"confidence\": 0.95,\n      \"evidence\": [\n        {\n          \"pageNumber\": 3,\n          \"excerpt\": \"exact text copied from page 3 without modifications\"\n        }\n      ]\n    }\n  ]\n}",
+    "suggestions_count": 3,
+    "temperature": 0.3,
+    "max_tokens": 2000
+  },
+  "metrics": {
+    "text": { "metric": "bertscore", "threshold": 0.5 },
+    "single_select": { "metric": "exact_match", "threshold": 1.0 },
+    "boolean": { "metric": "exact_match", "threshold": 1.0 },
+    "multi_select": { "metric": "f1", "threshold": 0.3 },
+    "repeat_text": { "metric": "bertscore_best_match", "threshold": 0.5 },
+    "select": { "metric": "exact_match", "threshold": 1.0 },
+    "text_object": { "metric": "exact_match", "threshold": 1.0 },
+    "url": { "metric": "exact_match", "threshold": 1.0 }
+  },
+  "skip_questions": ["contact_email", "doi"],
+  "skip_types": ["url", "repeat_group", "group"],
+  "ground_truth_mappings": {
+    "research_paradigm": {
+      "path": ["questionnaire_data", "research_paradigm"],
+      "transform": "direct"
+    },
+    "research_questions_list": {
+      "path": ["questionnaire_data", "research_questions"],
+      "transform": "custom",
+      "config": {
+        "custom_id": "research_questions_list"
+      }
+    },
+    "data_collection_methods": {
+      "path": ["questionnaire_data", "data_collection", "methods"],
+      "transform": "array_field",
+      "config": { "field": "name" }
+    },
+    "data_type": {
+      "path": ["questionnaire_data", "data_collection", "data_type"],
+      "transform": "ensure_array"
+    },
+    "analysis_methods": {
+      "path": ["questionnaire_data", "data_analysis"],
+      "transform": "analysis_methods_aggregate"
+    },
+    "descriptive_stats_used": {
+      "path": ["questionnaire_data", "data_analysis", "descriptive"],
+      "transform": "array_non_empty_boolean"
+    },
+    "measures_frequency": {
+      "path": ["questionnaire_data", "data_analysis", "descriptive_measures", "frequency"],
+      "transform": "filter_array"
+    },
+    "measures_central": {
+      "path": ["questionnaire_data", "data_analysis", "descriptive_measures", "central_tendency"],
+      "transform": "filter_array"
+    },
+    "measures_dispersion": {
+      "path": ["questionnaire_data", "data_analysis", "descriptive_measures", "dispersion"],
+      "transform": "filter_array"
+    },
+    "measures_position": {
+      "path": ["questionnaire_data", "data_analysis", "descriptive_measures", "position"],
+      "transform": "filter_array"
+    },
+    "inferential_stats_used": {
+      "path": ["questionnaire_data", "data_analysis", "inferential"],
+      "transform": "array_non_empty_boolean"
+    },
+    "statistical_tests": {
+      "path": ["questionnaire_data", "data_analysis", "statistical_tests"],
+      "transform": "filter_array"
+    },
+    "ml_used": {
+      "path": ["questionnaire_data", "data_analysis", "machine_learning"],
+      "transform": "array_non_empty_boolean"
+    },
+    "ml_algorithms": {
+      "path": ["questionnaire_data", "data_analysis", "ml_algorithms"],
+      "transform": "filter_array"
+    },
+    "ml_metrics": {
+      "path": ["questionnaire_data", "data_analysis", "ml_metrics"],
+      "transform": "filter_array"
+    },
+    "other_analysis_used": {
+      "path": ["questionnaire_data", "data_analysis", "other_methods"],
+      "transform": "array_non_empty_boolean"
+    },
+    "other_analysis_methods": {
+      "path": ["questionnaire_data", "data_analysis", "other_methods"],
+      "transform": "filter_array"
+    },
+    "threats_reported": {
+      "path": ["questionnaire_data", "threats_to_validity"],
+      "transform": "flags_to_list",
+      "config": {
+        "external": "external validity",
+        "internal": "internal validity",
+        "construct": "construct validity",
+        "conclusion": "conclusion validity",
+        "reliability": "reliability",
+        "generalizability": "generalizability",
+        "repeatability": "repeatability",
+        "content_validity": "content validity",
+        "descriptive_validity": "descriptive validity",
+        "theoretical_validity": "theoretical validity"
+      }
+    },
+    "threats_mentioned_uncategorized": {
+      "path": ["questionnaire_data", "threats_to_validity", "mentioned_uncategorized"],
+      "transform": "truthy_to_yes_no"
+    },
+    "answer_highlighted": {
+      "path": ["questionnaire_data", "answer_highlighted"],
+      "transform": "truthy_to_yes_no"
+    },
+    "answer_hidden": {
+      "path": ["questionnaire_data", "answer_hidden"],
+      "transform": "truthy_to_yes_no"
+    },
+    "data_urls": {
+      "path": ["questionnaire_data", "data_collection", "data_urls"],
+      "transform": "filter_array"
+    },
+    "rq_text": {
+      "path": ["questionnaire_data", "research_questions"],
+      "transform": "first_item_field",
+      "config": { "field": "question" }
+    },
+    "rq_highlighted": {
+      "path": ["questionnaire_data", "research_questions"],
+      "transform": "first_item_boolean_field",
+      "config": { "field": "highlighted_question" }
+    },
+    "rq_hidden": {
+      "path": ["questionnaire_data", "research_questions"],
+      "transform": "first_item_boolean_field",
+      "config": { "field": "hidden" }
+    },
+    "rq_type": {
+      "path": ["questionnaire_data", "research_questions"],
+      "transform": "first_item_field",
+      "config": { "field": "type" }
+    },
+    "subq_text": {
+      "path": ["questionnaire_data", "research_questions"],
+      "transform": "nested_first_item_field",
+      "config": { "nested_field": "subquestions", "field": "question" }
+    },
+    "subq_type": {
+      "path": ["questionnaire_data", "research_questions"],
+      "transform": "nested_first_item_field",
+      "config": { "nested_field": "subquestions", "field": "type" }
+    },
+    "method_type": {
+      "path": ["questionnaire_data", "data_collection", "methods"],
+      "transform": "first_item_field",
+      "config": { "field": "type" }
+    },
+    "method_name_custom": {
+      "path": ["questionnaire_data", "data_collection", "methods"],
+      "transform": "first_item_field",
+      "config": { "field": "name" }
+    },
+    "hypothesis_statement": {
+      "path": ["questionnaire_data", "data_analysis", "hypotheses"],
+      "transform": "join_array_field",
+      "config": { "field": "statement", "separator": " | " }
+    },
+    "hypothesis_type": {
+      "path": ["questionnaire_data", "data_analysis", "hypotheses"],
+      "transform": "join_array_field",
+      "config": { "field": "type", "separator": " | " }
+    }
+  },
+  "sibling_dependencies": {
+    "rq_text": [],
+    "rq_highlighted": ["rq_text"],
+    "rq_hidden": ["rq_text", "rq_highlighted"],
+    "rq_type": ["rq_text", "rq_highlighted", "rq_hidden"],
+    "subq_text": ["rq_text", "rq_highlighted", "rq_hidden", "rq_type"],
+    "subq_type": ["rq_text", "rq_highlighted", "rq_hidden", "rq_type", "subq_text"],
+    "answer_highlighted": [],
+    "answer_hidden": ["answer_highlighted"],
+    "method_type": [],
+    "method_name_custom": ["method_type"],
+    "data_type": [],
+    "data_urls": ["data_type"],
+    "descriptive_stats_used": [],
+    "measures_frequency": ["descriptive_stats_used"],
+    "measures_central": ["descriptive_stats_used", "measures_frequency"],
+    "measures_dispersion": ["descriptive_stats_used", "measures_frequency", "measures_central"],
+    "measures_position": ["descriptive_stats_used", "measures_frequency", "measures_central", "measures_dispersion"],
+    "inferential_stats_used": [],
+    "hypothesis_statement": ["inferential_stats_used"],
+    "hypothesis_type": ["inferential_stats_used", "hypothesis_statement"],
+    "statistical_tests": ["inferential_stats_used", "hypothesis_statement", "hypothesis_type"],
+    "ml_used": [],
+    "ml_algorithms": ["ml_used"],
+    "ml_metrics": ["ml_used", "ml_algorithms"],
+    "other_analysis_used": [],
+    "other_analysis_methods": ["other_analysis_used"],
+    "threats_reported": [],
+    "threats_mentioned_uncategorized": ["threats_reported"]
+  }
+}

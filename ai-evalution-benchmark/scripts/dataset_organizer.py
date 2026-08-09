@@ -49,6 +49,13 @@ class DatasetOrganizer:
         resource_id = paper_id.rstrip("/").split("/")[-1] if "/" in paper_id else paper_id
         pdf_exists = (self.base_path / resource_id / "paper.pdf").exists()
         
+        # Avoid duplicates
+        existing = next((p for p in self.papers if p['paper_id'] == paper_id), None)
+        if existing:
+            existing['pdf_status'] = 'downloaded' if pdf_exists else 'not_available'
+            existing['metadata_completeness'] = self._calc_completeness(metadata)
+            return
+        
         self.papers.append({
             'paper_id': paper_id,
             'title': metadata.get('title'),
@@ -60,52 +67,31 @@ class DatasetOrganizer:
         })
     
     def _calc_completeness(self, metadata: Dict[str, Any]) -> float:
-        fields = ['title', 'year', 'doi', 'venue', 'contribution_id']
-        populated = sum(1 for f in fields if metadata.get(f))
+        """Calculate metadata completeness by counting non-empty fields recursively."""
+        total, populated = self._count_fields(metadata)
+        return round(populated / max(total, 1), 3)
+    
+    def _count_fields(self, obj: Any, depth: int = 0) -> tuple:
+        """Recursively count total leaf fields and populated ones."""
+        if depth > 5:
+            return (1, 1 if obj else 0)
         
-        qdata = metadata.get('questionnaire_data', {})
-        
-        # Research paradigm
-        if qdata.get('research_paradigm'):
-            populated += 1
-        
-        # Data collection
-        dc = qdata.get('data_collection', {})
-        if dc.get('methods'):
-            populated += 1
-        if dc.get('data_type'):
-            populated += 1
-        if dc.get('data_urls'):
-            populated += 1
-        
-        # Data analysis
-        da = qdata.get('data_analysis', {})
-        if any(da.get(k) for k in ['descriptive', 'inferential', 'machine_learning', 'other_methods']):
-            populated += 1
-        if da.get('descriptive_measures', {}).get('frequency') or \
-           da.get('descriptive_measures', {}).get('central_tendency') or \
-           da.get('descriptive_measures', {}).get('dispersion') or \
-           da.get('descriptive_measures', {}).get('position'):
-            populated += 1
-        if da.get('statistical_tests'):
-            populated += 1
-        if da.get('ml_algorithms'):
-            populated += 1
-        if da.get('ml_metrics'):
-            populated += 1
-        if da.get('hypotheses'):
-            populated += 1
-        
-        # Threats to validity
-        if any(qdata.get('threats_to_validity', {}).values()):
-            populated += 1
-        
-        # Research questions
-        if qdata.get('research_questions'):
-            populated += 1
-        
-        # Total possible fields: 5 (basic) + 15 (questionnaire) = 20
-        return round(populated / 20, 3)
+        if isinstance(obj, dict):
+            total = 0
+            populated = 0
+            for value in obj.values():
+                t, p = self._count_fields(value, depth + 1)
+                total += t
+                populated += p
+            return (max(total, 1), populated)
+        elif isinstance(obj, list):
+            return (1, 1 if len(obj) > 0 else 0)
+        elif isinstance(obj, str):
+            return (1, 1 if obj.strip() else 0)
+        elif obj is None:
+            return (1, 0)
+        else:
+            return (1, 1 if obj else 0)
     
     def generate_index(self, output_file: str = "dataset_index.json") -> None:
         self.stats['papers_without_pdf'] = self.stats['total_papers'] - self.stats['papers_with_pdf']

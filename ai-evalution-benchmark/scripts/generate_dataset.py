@@ -1,4 +1,17 @@
 #!/usr/bin/env python3
+"""
+Dataset Generation Script - Template-driven
+
+Generates evaluation datasets by:
+1. Loading a template's companion .dataset.json config
+2. Running the SPARQL query defined in that config
+3. Aggregating results using the result mapping
+4. Downloading PDFs and organizing the dataset
+
+Usage:
+  python generate_dataset.py --template ../evaluation/templates/my_template.json
+  python generate_dataset.py --template ../evaluation/templates/my_template.json --limit 50
+"""
 import sys
 import os
 import argparse
@@ -9,7 +22,7 @@ from datetime import datetime
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from sparql_fetcher import SPARQLFetcher
+from sparql_fetcher import SPARQLFetcher, load_dataset_config
 from pdf_downloader import PDFDownloader
 from dataset_organizer import DatasetOrganizer
 from data_validator import DataValidator
@@ -26,19 +39,27 @@ try:
 except ImportError:
     HAS_DOTENV = False
 
+
 def load_config(config_path: str) -> dict:
     with open(config_path, 'r') as f:
         return yaml.safe_load(f)
 
+
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description='Generate AI evaluation dataset from ORKG')
     parser.add_argument('--config', type=str, default='config.yaml', help='Path to config file')
+    parser.add_argument(
+        '--template', type=str,
+        help='Path to questionnaire template JSON file. '
+             'A companion .dataset.json must exist alongside it.'
+    )
     parser.add_argument('--limit', type=int, help='Limit number of papers')
     parser.add_argument('--no-pdf', action='store_true', help='Skip PDF downloads')
     parser.add_argument('--resume', action='store_true', help='Resume from previous run')
     parser.add_argument('--retry-failed', action='store_true', help='Only retry papers without PDFs')
     parser.add_argument('--output', type=str, help='Output directory')
     return parser.parse_args()
+
 
 def validate_config(config: dict, args: argparse.Namespace) -> dict:
     if args.limit is not None:
@@ -47,31 +68,35 @@ def validate_config(config: dict, args: argparse.Namespace) -> dict:
         config['dataset']['base_path'] = args.output
     if args.resume:
         config['dataset']['resume_on_failure'] = True
-    
+
     if HAS_DOTENV:
         load_dotenv()
-    
+
     if not args.no_pdf:
         unpaywall_email = os.getenv('UNPAYWALL_EMAIL')
         if unpaywall_email:
             config['pdf_download']['unpaywall_email'] = unpaywall_email
-    
+
     return config
+
 
 def process_papers(papers: dict, organizer: DatasetOrganizer, pdf_downloader: PDFDownloader = None,
                    skip_pdf: bool = False, resume: bool = False) -> dict:
-    stats = {'total': len(papers), 'processed': 0, 'skipped': 0, 'metadata_saved': 0, 'pdf_downloaded': 0, 'pdf_failed': 0, 'errors': 0}
+    stats = {
+        'total': len(papers), 'processed': 0, 'skipped': 0,
+        'metadata_saved': 0, 'pdf_downloaded': 0, 'pdf_failed': 0, 'errors': 0
+    }
     iterator = tqdm(papers.items(), desc="Processing papers", unit="paper") if HAS_TQDM else papers.items()
-    
+
     for paper_id, metadata in iterator:
         try:
             if resume and organizer.paper_exists(paper_id):
                 if skip_pdf or organizer.has_pdf(paper_id):
                     stats['skipped'] += 1
                     continue
-            
+
             paper_dir = organizer.create_paper_directory(paper_id)
-            
+
             full_metadata = {
                 'paper_id': paper_id,
                 'title': metadata.get('title'),
@@ -83,10 +108,10 @@ def process_papers(papers: dict, organizer: DatasetOrganizer, pdf_downloader: PD
                 'pdf_available': False,
                 'questionnaire_data': metadata.get('questionnaire_data', {})
             }
-            
+
             organizer.save_metadata(paper_id, full_metadata)
             stats['metadata_saved'] += 1
-            
+
             if not skip_pdf and pdf_downloader and (doi := metadata.get('doi')):
                 pdf_path = paper_dir / "paper.pdf"
                 if pdf_downloader.download_pdf(doi, str(pdf_path)):
@@ -95,47 +120,76 @@ def process_papers(papers: dict, organizer: DatasetOrganizer, pdf_downloader: PD
                     organizer.save_metadata(paper_id, full_metadata)
                 else:
                     stats['pdf_failed'] += 1
-            
+
             stats['processed'] += 1
-        except:
+        except Exception:
             stats['errors'] += 1
-    
+
     return stats
+
 
 def main():
     start_time = datetime.now()
-    
+
     print("=" * 70)
     print("AI Evaluation Dataset Generation")
     print("=" * 70)
-    
+
     args = parse_arguments()
-    
+
     try:
         config = load_config(args.config)
         config = validate_config(config, args)
     except Exception as e:
         print(f"Error loading configuration: {e}")
         sys.exit(1)
-    
+
+    # Load dataset config from template companion file
+    dataset_config = None
+    if args.template:
+        template_path = Path(args.template).resolve()
+        if not template_path.exists():
+            print(f"Error: Template file not found: {template_path}")
+            sys.exit(1)
+
+        try:
+            dataset_config = load_dataset_config(str(template_path))
+            print(f"Template: {template_path.name}")
+            print(f"Dataset config: {template_path.stem}.dataset.json")
+            print(f"Template ID: {dataset_config.get('template_id', 'unknown')}")
+
+            # Override endpoint from dataset config if specified
+            if "sparql" in dataset_config and "endpoint" in dataset_config["sparql"]:
+                config['orkg']['endpoint'] = dataset_config["sparql"]["endpoint"]
+                print(f"SPARQL endpoint (from dataset config): {config['orkg']['endpoint']}")
+        except FileNotFoundError as e:
+            print(f"Error: {e}")
+            sys.exit(1)
+    else:
+        print("Error: --template is required. Specify the path to a questionnaire template JSON file.")
+        print("       A companion .dataset.json file must exist alongside it.")
+        print("\n  Example: python generate_dataset.py --template ../evaluation/templates/empirical_research_questionaire.json")
+        sys.exit(1)
+
     print(f"\nOutput directory: {config['dataset']['base_path']}")
     if config['dataset'].get('limit_papers'):
         print(f"Processing limit: {config['dataset']['limit_papers']} papers")
     if args.no_pdf:
         print("PDF downloads: DISABLED")
     print()
-    
+
     try:
         sparql_fetcher = SPARQLFetcher(
             endpoint_url=config['orkg']['endpoint'],
-            timeout=config['orkg'].get('timeout', 30)
+            timeout=config['orkg'].get('timeout', 30),
+            dataset_config=dataset_config
         )
-        
+
         organizer = DatasetOrganizer(
             base_path=config['dataset']['base_path'],
             skip_existing=config['dataset'].get('skip_existing', True)
         )
-        
+
         pdf_downloader = None
         if not args.no_pdf:
             pdf_downloader = PDFDownloader(
@@ -147,47 +201,47 @@ def main():
     except Exception as e:
         print(f"Failed to initialize components: {e}")
         sys.exit(1)
-    
+
     if args.retry_failed:
         print("Retry mode: Only processing papers without PDFs...")
         papers_to_retry = {}
-        
+
         for paper_dir in Path(config['dataset']['base_path']).iterdir():
             if not paper_dir.is_dir() or paper_dir.name.startswith('.'):
                 continue
-            
+
             metadata_file = paper_dir / "metadata.json"
             pdf_file = paper_dir / "paper.pdf"
-            
+
             if metadata_file.exists() and not pdf_file.exists():
                 try:
                     metadata = json.loads(metadata_file.read_text())
                     papers_to_retry[metadata.get('paper_id', paper_dir.name)] = metadata
-                except:
+                except Exception:
                     pass
-        
+
         papers = papers_to_retry
         print(f"Found {len(papers)} papers without PDFs\n")
-        
+
         if len(papers) == 0:
             print("All papers already have PDFs!")
             sys.exit(0)
     else:
         print("Fetching papers from ORKG...")
-        
+
         try:
             papers = sparql_fetcher.fetch_all_papers_with_metadata(
                 limit=config['dataset'].get('limit_papers')
             )
             print(f"Fetched {len(papers)} papers from ORKG\n")
-            
+
             if len(papers) == 0:
                 print("No papers found. Exiting.")
                 sys.exit(0)
         except Exception as e:
             print(f"Error fetching papers: {e}")
             sys.exit(1)
-    
+
     try:
         stats = process_papers(
             papers=papers,
@@ -205,17 +259,17 @@ def main():
     finally:
         if pdf_downloader:
             pdf_downloader.close()
-    
+
     print("\nGenerating dataset index...")
     organizer.generate_index()
-    
+
     print("\nGenerating data quality report...")
     validator = DataValidator()
     quality_report = validator.generate_quality_report(
         Path(config['dataset']['base_path']),
         output_file=Path('logs/quality_report.json')
     )
-    
+
     print("\n" + "=" * 70)
     print("Data Quality Summary")
     print("=" * 70)
@@ -224,9 +278,9 @@ def main():
     print(f"Papers missing DOI:        {summary.get('papers_missing_doi', 0)}")
     print(f"Papers without PDF:        {summary.get('papers_without_pdf', 0)}")
     print(f"Low completeness papers:   {summary.get('papers_with_low_completeness', 0)}")
-    
+
     elapsed = datetime.now() - start_time
-    
+
     print("\n" + "=" * 70)
     print("Dataset Generation Complete")
     print("=" * 70)
@@ -234,17 +288,18 @@ def main():
     print(f"Processed:           {stats['processed']}")
     print(f"Skipped:             {stats['skipped']}")
     print(f"Metadata saved:      {stats['metadata_saved']}")
-    
+
     if not args.no_pdf:
         print(f"PDFs downloaded:     {stats['pdf_downloaded']}")
         print(f"PDF failures:        {stats['pdf_failed']}")
-    
+
     print(f"Errors:              {stats['errors']}")
     print(f"\nElapsed time:        {elapsed}")
     print(f"Output directory:    {config['dataset']['base_path']}")
     print()
-    
+
     sys.exit(1 if stats['errors'] > 0 else 0)
+
 
 if __name__ == '__main__':
     main()

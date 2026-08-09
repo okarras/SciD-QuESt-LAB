@@ -1,9 +1,10 @@
 /**
- * Template Loader - Loads the EXACT frontend questionnaire template
+ * Template Loader - Loads the questionnaire template
  */
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { EvalConfigLoader } from './eval-config-loader';
 
 export interface TemplateQuestion {
   id: string;
@@ -34,12 +35,24 @@ export interface QuestionnaireTemplate {
 export class FrontendTemplateLoader {
   private templatePath: string;
   private template: QuestionnaireTemplate | null = null;
+  private evalConfigLoader: EvalConfigLoader;
 
-  constructor() {
-    this.templatePath = path.resolve(
-      __dirname,
-      '../templates/empirical_research_questionaire.json'
-    );
+  constructor(templatePath?: string) {
+    this.templatePath =
+      templatePath ||
+      path.resolve(
+        __dirname,
+        '../templates/empirical_research_questionaire.json'
+      );
+    this.evalConfigLoader = new EvalConfigLoader(this.templatePath);
+  }
+
+  getTemplatePath(): string {
+    return this.templatePath;
+  }
+
+  getEvalConfigLoader(): EvalConfigLoader {
+    return this.evalConfigLoader;
   }
 
   loadTemplate(): QuestionnaireTemplate {
@@ -141,23 +154,23 @@ export class FrontendTemplateLoader {
 
   getEvaluationQuestions(): TemplateQuestion[] {
     const allQuestions = this.getAllQuestions();
+    const evalConfig = this.evalConfigLoader.load();
+    const skipQuestions = evalConfig.skip_questions;
+    const skipTypes = evalConfig.skip_types;
 
     return allQuestions.filter((question) => {
-      // Skip questions that are not suitable for AI evaluation
-      const skipTypes = ['url', 'repeat_group', 'group'];
-
+      // Skip types defined in eval config
       if (skipTypes.includes(question.type)) {
         return false;
       }
 
-      // Skip questions that disable AI assistant
+      // Skip questions that disable AI assistant (template-level flag)
       if (question.disable_ai_assistant) {
         return false;
       }
 
-      // Skip personal/contact information questions
-      const skipIds = ['contact_email', 'doi'];
-      if (skipIds.includes(question.id)) {
+      // Skip question IDs defined in eval config
+      if (skipQuestions.includes(question.id)) {
         return false;
       }
 

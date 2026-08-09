@@ -2,7 +2,8 @@
  * Simple Metrics Calculator - Clean and intuitive evaluation metrics
  */
 
-import { getBERTScoreCalculator, BERTScoreResult } from './bertscore-wrapper';
+import { getBERTScoreCalculator } from './bertscore-wrapper';
+import type { EvalConfig, MetricConfig } from './eval-config-loader';
 
 export interface Suggestion {
   position: number;
@@ -37,7 +38,7 @@ export interface QuestionResult {
 }
 
 export interface SuggestionPerformance {
-  position: number; // 1, 2, or 3
+  position: number;
   totalQuestions: number;
 
   textQuestions: {
@@ -74,18 +75,40 @@ export interface EvaluationSummary {
   };
 }
 
+// Default thresholds used when no eval config is provided
+const DEFAULT_METRICS: Record<string, MetricConfig> = {
+  text: { metric: 'bertscore', threshold: 0.5 },
+  single_select: { metric: 'exact_match', threshold: 1.0 },
+  select: { metric: 'exact_match', threshold: 1.0 },
+  boolean: { metric: 'exact_match', threshold: 1.0 },
+  multi_select: { metric: 'f1', threshold: 0.3 },
+  repeat_text: { metric: 'bertscore_best_match', threshold: 0.5 },
+  text_object: { metric: 'exact_match', threshold: 1.0 },
+  url: { metric: 'exact_match', threshold: 1.0 },
+};
+
 export class SimpleMetricsCalculator {
   private useBERTScore: boolean;
   private bertScoreCalculator: ReturnType<
     typeof getBERTScoreCalculator
   > | null = null;
+  private metricsConfig: Record<string, MetricConfig>;
 
-  constructor(options: { useBERTScore?: boolean } = {}) {
+  constructor(options: { useBERTScore?: boolean; evalConfig?: EvalConfig } = {}) {
     this.useBERTScore = options.useBERTScore ?? false;
+    this.metricsConfig = options.evalConfig?.metrics || DEFAULT_METRICS;
 
     if (this.useBERTScore) {
       this.bertScoreCalculator = getBERTScoreCalculator();
     }
+  }
+
+  private getThreshold(questionType: string): number {
+    const normalized = questionType.toLowerCase();
+    const config = this.metricsConfig[normalized];
+    if (config) return config.threshold;
+    // Fallback
+    return 0.5;
   }
 
   async calculateQuestionMetrics(
@@ -104,6 +127,7 @@ export class SimpleMetricsCalculator {
     }
 
     const normalizedGroundTruth = this.normalizeAnswer(String(groundTruth));
+    const threshold = this.getThreshold(questionType);
 
     const suggestionMetrics: SuggestionMetrics[] = [];
 
@@ -132,12 +156,6 @@ export class SimpleMetricsCalculator {
               );
             } catch (error) {
               console.error(`BERTScore failed for ${questionId}:`, error);
-              console.error(
-                `Error type: ${error instanceof Error ? error.constructor.name : typeof error}`
-              );
-              console.error(
-                `Error message: ${error instanceof Error ? error.message : String(error)}`
-              );
               console.error(`Falling back to token-based F1`);
               const fallbackResult = this.calculateTokenBasedF1(
                 normalizedPrediction,
@@ -146,16 +164,13 @@ export class SimpleMetricsCalculator {
               bertScore = fallbackResult.f1;
             }
           } else {
-            console.warn(
-              `BERTScore not enabled, using token-based F1 for ${questionId}`
-            );
             const fallbackResult = this.calculateTokenBasedF1(
               normalizedPrediction,
               normalizedGroundTruth
             );
             bertScore = fallbackResult.f1;
           }
-          isCorrect = bertScore > 0.5;
+          isCorrect = bertScore > threshold;
           break;
 
         case 'select':
@@ -185,7 +200,7 @@ export class SimpleMetricsCalculator {
             this.parseMultiSelectItems(normalizedGroundTruth)
           );
           f1Score = f1ScoreResult;
-          isCorrect = f1Score > 0.5;
+          isCorrect = f1Score > threshold;
           break;
 
         default:
@@ -244,6 +259,7 @@ export class SimpleMetricsCalculator {
     const normalizedGroundTruth = this.normalizeAnswer(
       groundTruthForComparison
     );
+    const threshold = this.getThreshold(questionType);
 
     const suggestionMetrics: SuggestionMetrics[] = [];
 
@@ -267,14 +283,7 @@ export class SimpleMetricsCalculator {
                 normalizedGroundTruth
               );
               bertScore = result.f1;
-              console.log(
-                `✓ BERTScore calculated for ${questionId} (array GT): F1=${bertScore.toFixed(4)}`
-              );
             } catch (error) {
-              console.error(
-                `✗ BERTScore failed for ${questionId} (array GT):`,
-                error
-              );
               const fallbackResult = this.calculateTokenBasedF1(
                 normalizedPrediction,
                 normalizedGroundTruth
@@ -288,7 +297,7 @@ export class SimpleMetricsCalculator {
             );
             bertScore = tokenResult.f1;
           }
-          isCorrect = bertScore > 0.5;
+          isCorrect = bertScore > threshold;
           break;
 
         case 'select':
@@ -317,7 +326,7 @@ export class SimpleMetricsCalculator {
             groundTruthArray.map(String)
           );
           f1Score = f1ScoreResult;
-          isCorrect = f1Score > 0.3;
+          isCorrect = f1Score > threshold;
           break;
 
         default:
@@ -360,6 +369,7 @@ export class SimpleMetricsCalculator {
     const gtStrings = groundTruthArray
       .map((g) => String(g))
       .filter((g) => g.trim());
+    const threshold = this.getThreshold('repeat_text');
     const suggestionMetrics: SuggestionMetrics[] = [];
 
     for (let index = 0; index < suggestions.length; index++) {
@@ -406,7 +416,7 @@ export class SimpleMetricsCalculator {
       suggestionMetrics.push({
         position,
         text: suggestionTextStr,
-        isCorrect: bestBertScore > 0.5,
+        isCorrect: bestBertScore > threshold,
         bertScore: bestBertScore,
       });
     }
