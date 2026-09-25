@@ -82,11 +82,11 @@ app.post('/api/ai/generate', async (req, res) => {
 
     if (
       maxTokens !== undefined &&
-      (typeof maxTokens !== 'number' || maxTokens < 1 || maxTokens > 8000)
+      (typeof maxTokens !== 'number' || maxTokens < 1 || maxTokens > 200000)
     ) {
       return res
         .status(400)
-        .json({ error: 'Max tokens must be a number between 1 and 8000' });
+        .json({ error: 'Max tokens must be a number between 1 and 200000' });
     }
 
     const result = await aiService.generateText({

@@ -79,21 +79,22 @@ export class FrontendStructuredPDFExtractor {
         .replace(/\n{3,}/g, '\n\n')
         .trim();
 
-      const lines = pageText.split(/\n/);
-      const filteredLines = lines.filter((line: string) => {
-        const lower = line.toLowerCase().trim();
-        if (lower.length > 200) return true;
-        if (
-          lower.includes('authorized licensed use') ||
-          (lower.includes('downloaded on') && lower.includes('from ieee xplore')) ||
-          (lower.includes('restrictions apply') && lower.length < 50) ||
-          (lower.includes('technische informationsbibliothek') && lower.length < 150)
-        ) {
-          return false;
-        }
-        return true;
-      });
-      pageText = filteredLines.join('\n').trim();
+      // Strip the IEEE Xplore DRM watermark wherever it appears (it is often
+      // embedded inline with real page content, so line-level filtering misses
+      // it). The watermark reads like:
+      //   "Authorized licensed use limited to: <library>. Downloaded on
+      //    <date> at <time> UTC from IEEE Xplore.  Restrictions apply."
+      pageText = pageText
+        .replace(
+          /Authorized licensed use limited to:.*?from IEEE Xplore\.\s*Restrictions apply\.?/gis,
+          ' '
+        )
+        // Fallback: catch a partial watermark if the full pattern didn't match
+        .replace(/Authorized licensed use limited to:[^.]*\.?/gi, ' ')
+        .replace(/Downloaded on [^.]*from IEEE Xplore\.?/gi, ' ')
+        .replace(/Restrictions apply\.?/gi, ' ')
+        .replace(/[ \t]{2,}/g, ' ')
+        .trim();
 
       const wordCount = pageText
         .split(/\s+/)

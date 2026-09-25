@@ -177,38 +177,69 @@ export class BatchResponseParser {
     const results: ParsedBatchAnswer[] = [];
 
     for (const qId of questionIds) {
-      // Try to find a JSON-like block for this question
-      const pattern = new RegExp(
-        `"${qId}"\\s*:\\s*\\{([^}]+(?:\\{[^}]*\\}[^}]*)*)\\}`,
-        's'
-      );
-      const match = rawResponse.match(pattern);
+      const block = this.extractBalancedObject(rawResponse, qId);
 
-      if (match) {
+      if (block) {
         try {
-          const blockJson = `{${match[0]}}`;
-          const parsed = JSON.parse(blockJson);
+          const parsed = JSON.parse(`{${JSON.stringify(qId)}:${block}}`);
           const answer = parsed[qId];
           const suggestions = this.extractSuggestions(answer);
           results.push({ questionId: qId, suggestions, parseSuccess: true });
+          continue;
         } catch {
-          results.push({
-            questionId: qId,
-            suggestions: [],
-            parseSuccess: false,
-            error: 'Salvage parse failed',
-          });
+          // fall through to failure
         }
-      } else {
-        results.push({
-          questionId: qId,
-          suggestions: [],
-          parseSuccess: false,
-          error: 'Not found in response',
-        });
       }
+
+      results.push({
+        questionId: qId,
+        suggestions: [],
+        parseSuccess: false,
+        error: block ? 'Salvage parse failed' : 'Not found in response',
+      });
     }
 
     return results;
+  }
+
+  private extractBalancedObject(text: string, qId: string): string | null {
+    const keyPattern = new RegExp(`"${qId}"\\s*:\\s*\\{`);
+    const match = text.match(keyPattern);
+    if (!match || match.index === undefined) return null;
+
+    // Index of the opening brace of the value object
+    const start = match.index + match[0].length - 1;
+
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+
+    for (let i = start; i < text.length; i++) {
+      const ch = text[i];
+
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+        } else if (ch === '\\') {
+          escaped = true;
+        } else if (ch === '"') {
+          inString = false;
+        }
+        continue;
+      }
+
+      if (ch === '"') {
+        inString = true;
+      } else if (ch === '{') {
+        depth++;
+      } else if (ch === '}') {
+        depth--;
+        if (depth === 0) {
+          return text.substring(start, i + 1);
+        }
+      }
+    }
+
+    return null;
   }
 }

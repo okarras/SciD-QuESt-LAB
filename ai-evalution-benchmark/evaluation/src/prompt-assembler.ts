@@ -136,15 +136,16 @@ export class FrontendPromptAssembler {
 
     const contentSection = `PDF Content:\n${pdfContent}`;
 
-    const instructionsSection = `Generate exactly 3 suggestions with supporting evidence from the PDF content above.
+    const instructionsSection = `Answer the QUESTION above using only the PDF Content. Provide exactly 3 ranked suggestions with supporting evidence.
 
 REMEMBER: For evidence excerpts, copy the EXACT text from the PDF. The excerpts will be used to highlight text in the PDF viewer, so they must match exactly.`;
 
+    // Order: metadata -> PDF content -> the QUESTION (last) -> instructions.
     const userPrompt = `${metadataSection}
 
-${questionSection}
-
 ${contentSection}
+
+${questionSection}
 
 ${instructionsSection}`;
 
@@ -190,17 +191,19 @@ ${instructionsSection}`;
     }
 
     const contentSection = `PDF Content:\n${pdfContent}`;
-    const instructionsSection = `Generate exactly 3 suggestions with supporting evidence from the PDF content above.
+    const instructionsSection = `Answer the QUESTION above using only the PDF Content. Provide exactly 3 ranked suggestions with supporting evidence.
 
 REMEMBER: For evidence excerpts, copy the EXACT text from the PDF. The excerpts will be used to highlight text in the PDF viewer, so they must match exactly.`;
 
+    // Order: metadata -> sibling context (background) -> PDF content -> the
+    // QUESTION (last, freshest in attention) -> answer instructions.
     const userPrompt = `${metadataSection}
 ${siblingContextSection}
+${contentSection}
+
 ${questionSection}
 
-NOTE: The above is the SPECIFIC question you need to generate suggestions for. The sibling context section above is provided only as background — do NOT answer those questions. Focus your suggestions ONLY on the question above.
-
-${contentSection}
+NOTE: This is the SPECIFIC question to answer. The sibling context above is background only — do NOT answer those sibling questions. Focus solely on the question above.
 
 ${instructionsSection}`;
 

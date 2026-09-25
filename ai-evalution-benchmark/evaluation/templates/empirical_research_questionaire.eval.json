@@ -2,23 +2,31 @@
   "template_id": "R186708",
   "version": "1.0",
   "evaluation": {
-    "system_prompt": "You are an AI assistant helping researchers extract information from academic papers.\nYour task is to analyze the provided PDF content and suggest answers to specific questions.\n\nThe PDF content is organized by chunks and pages (e.g., [PAGE 1], [PAGE 3], [PAGE 4]).\nUse these markers to identify the exact source of your evidence.\n\nFor each suggestion:\n1. Provide a clear, concise answer\n2. Include supporting evidence with exact page numbers and text excerpts\n3. Rank suggestions by relevance and confidence\n4. If the question includes \"Available Options\", your suggestions MUST use ONLY those exact choices\n\nCRITICAL INSTRUCTIONS FOR EVIDENCE EXCERPTS:\n- Extract EXACT text from the PDF - copy it word-for-word as it appears\n- Use the exact page numbers from the chunks headers (e.g., [PAGE 3] means content is from page 3)\n- Keep excerpts between 10-50 words for best highlighting results\n- If the text has references like [1] or [Smith 2020], include them as they appear\n- The excerpt will be used to highlight text in the PDF, so accuracy is critical\n\n\nGenerate exactly 3 suggestions in the following JSON format:\n{\n  \"suggestions\": [\n    {\n      \"rank\": 1,\n      \"text\": \"suggested answer\",\n      \"confidence\": 0.95,\n      \"evidence\": [\n        {\n          \"pageNumber\": 3,\n          \"excerpt\": \"exact text copied from page 3 without modifications\"\n        }\n      ]\n    }\n  ]\n}",
+    "system_prompt": "You are an AI assistant helping researchers extract information from academic papers. Analyze the provided PDF content and answer the specific question.\n\nThe PDF content is organized by pages (e.g., [PAGE 1], [PAGE 3]). Use these markers to cite the exact source of your evidence.\n\nProvide exactly 3 suggestions, ranked strictly by how likely each is to be the correct answer:\n- Rank 1 MUST be your single best, most-supported answer — the one you would commit to if you could give only one.\n- Ranks 2 and 3 are genuinely plausible alternatives, in decreasing order of likelihood. Never place a weaker answer at rank 1.\n\nAnswer format:\n- If the question lists \"Available Options\", every answer MUST be exactly one of those options (verbatim, same casing).\n- For yes/no questions, answer \"yes\" or \"no\".\n- For free-text answers, prefer the paper's own wording and keep it concise.\n\nConfidence reflects evidence strength: 0.9 = explicitly stated in the paper, 0.5 = inferred, 0.2 = weak guess.\n\nEvidence: EVERY suggestion — including ranks 2 and 3 — must include at least one evidence item: the exact page number(s) from the [PAGE N] markers and a verbatim excerpt (10-50 words) copied word-for-word from the PDF. Never return an empty evidence list. The excerpt is used to highlight text in the PDF viewer, so it must match exactly.\n\nGenerate exactly 3 suggestions in the following JSON format (output ONLY this JSON):\n{\n  \"suggestions\": [\n    {\n      \"rank\": 1,\n      \"text\": \"suggested answer\",\n      \"confidence\": 0.95,\n      \"evidence\": [\n        {\n          \"pageNumber\": 3,\n          \"excerpt\": \"exact text copied from page 3 without modifications\"\n        }\n      ]\n    }\n  ]\n}",
     "suggestions_count": 3,
     "temperature": 0.3,
-    "max_tokens": 2000,
-    "batch_max_tokens": 8000
+    "max_tokens": 4000,
+    "batch_max_tokens": 0
   },
   "metrics": {
-    "text": { "metric": "bertscore", "threshold": 0.5 },
+    "text": { "metric": "bertscore", "threshold": 0.7 },
     "single_select": { "metric": "exact_match", "threshold": 1.0 },
     "boolean": { "metric": "exact_match", "threshold": 1.0 },
-    "multi_select": { "metric": "f1", "threshold": 0.3 },
-    "repeat_text": { "metric": "bertscore_best_match", "threshold": 0.5 },
+    "multi_select": { "metric": "f1", "threshold": 0.75 },
+    "repeat_text": { "metric": "bertscore_best_match", "threshold": 0.7 },
     "select": { "metric": "exact_match", "threshold": 1.0 },
     "text_object": { "metric": "exact_match", "threshold": 1.0 },
     "url": { "metric": "exact_match", "threshold": 1.0 }
   },
-  "skip_questions": ["contact_email", "doi"],
+  "skip_questions": [
+    "contact_email",
+    "doi",
+    "data_urls",
+    "answer_highlighted",
+    "descriptive_stats_used",
+    "inferential_stats_used",
+    "ml_used"
+  ],
   "skip_types": ["url", "repeat_group", "group"],
   "ground_truth_mappings": {
     "research_paradigm": {

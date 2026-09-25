@@ -117,6 +117,6 @@ export class EvalConfigLoader {
     }
 
     // Fallback defaults
-    return { metric: 'bertscore', threshold: 0.5 };
+    return { metric: 'bertscore', threshold: 0.7 };
   }
 }

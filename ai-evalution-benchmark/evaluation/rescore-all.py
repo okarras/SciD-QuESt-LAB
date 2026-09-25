@@ -25,6 +25,13 @@ import sys
 import re
 import os
 
+# Strict correctness thresholds (the only thresholds in the project).
+# text / repeat_text: BERTScore(max of bert/sbert/containment) >= STRICT_BERT
+# multi_select:       F1 >= STRICT_F1
+STRICT_BERT = 0.7
+STRICT_F1 = 0.75
+
+
 # BERTScore (lazy-loaded)
 
 _bert_scorer = None
@@ -44,12 +51,28 @@ def get_bert_scorer():
     return _bert_scorer if _bert_scorer else None
 
 
+_bertscore_broken = False
+
+
 def compute_bertscore(prediction: str, ground_truth: str) -> float:
+    global _bertscore_broken
+    if _bertscore_broken:
+        return fallback_text_score(prediction, ground_truth)
     scorer = get_bert_scorer()
     if scorer is None:
         return fallback_text_score(prediction, ground_truth)
-    P, R, F1 = scorer.score([prediction], [ground_truth])
-    return float(F1[0])
+    try:
+        P, R, F1 = scorer.score([prediction], [ground_truth])
+        return float(F1[0])
+    except Exception as e:
+        # bert-score / transformers version mismatch (e.g. missing
+        # build_inputs_with_special_tokens). Disable BERTScore for the rest of
+        # the run and rely on SBERT + containment (which are the stronger
+        # semantic signals in the max() anyway).
+        if not _bertscore_broken:
+            print(f"  WARNING: BERTScore unavailable ({e}); using SBERT + containment only.")
+        _bertscore_broken = True
+        return fallback_text_score(prediction, ground_truth)
 
 
 # SBERT Cosine Similarity (lazy-loaded)
@@ -365,18 +388,17 @@ def rescore_question(q):
                     if score > best_score:
                         best_score = score
                 bert_score = best_score
-                is_correct = bert_score >= 0.5
+                is_correct = bert_score >= STRICT_BERT
             else:
                 f1_score = multi_select_f1(text, gt_list)
-                threshold = 0.3 if isinstance(gt, list) else 0.5
-                is_correct = f1_score >= threshold
+                is_correct = f1_score >= STRICT_F1
 
         elif qtype == 'text':
             bert_score_raw = compute_bertscore(text, str(gt))
             sbert_score = compute_sbert_similarity(text, str(gt))
             contain = 1.0 if item_found_in_text(str(gt), text) else 0.0
             bert_score = max(bert_score_raw, sbert_score, contain)
-            is_correct = bert_score >= 0.5
+            is_correct = bert_score >= STRICT_BERT
 
         ms = {
             'position': s.get('position', 0),

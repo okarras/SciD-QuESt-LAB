@@ -166,6 +166,28 @@ export class BatchEvaluationRunner {
       console.log('Step 5: Computing metrics...');
       const evaluationResults: EvaluationResult[] = [];
 
+      // In batch mode the entire paper is answered in ONE LLM call. Storing the
+      // full raw response on every question would duplicate it N times and bloat
+      // the output. Keep the full interaction on the first question only; give the
+      // rest a lightweight reference.
+      const fullInteraction = backendResult.llmInteraction;
+      const slimInteraction = {
+        ...fullInteraction,
+        systemPrompt: '(see first question in this paper)',
+        userPrompt: '(see first question in this paper)',
+        fullPrompt: '(see first question in this paper)',
+        rawResponse: '(batch response stored on first question)',
+        parsedResponse: null,
+      };
+      let interactionAssigned = false;
+      const nextInteraction = () => {
+        if (!interactionAssigned) {
+          interactionAssigned = true;
+          return fullInteraction;
+        }
+        return slimInteraction;
+      };
+
       for (const question of questions) {
         const parsedAnswer = parseResult.answers.find(
           (a) => a.questionId === question.id
@@ -189,7 +211,7 @@ export class BatchEvaluationRunner {
               pdfContentLength: fullContent.length,
               backendDuration: backendResult.metadata.duration,
             },
-            llmInteraction: backendResult.llmInteraction,
+            llmInteraction: nextInteraction(),
             metrics: undefined,
           });
           continue;
@@ -232,7 +254,7 @@ export class BatchEvaluationRunner {
             pdfContentLength: fullContent.length,
             backendDuration: backendResult.metadata.duration,
           },
-          llmInteraction: backendResult.llmInteraction,
+          llmInteraction: nextInteraction(),
           metrics,
         });
       }
@@ -345,6 +367,7 @@ export class BatchEvaluationRunner {
       modelTag?: string;
       backendUrl?: string;
       onlyQuestions?: string[];
+      skipExisting?: boolean;
     } = {}
   ): Promise<EvaluationSummary> {
     const startTime = Date.now();
@@ -355,6 +378,22 @@ export class BatchEvaluationRunner {
     console.log(`Template: ${this.templateLoader.getTemplatePath()}`);
     console.log(`Dataset: ${datasetPath}`);
     console.log(`Output: ${outputPath}`);
+
+    // Load prior results so we can resume (skip papers already fully successful).
+    const priorResults = new Map<string, PaperEvaluationResult>();
+    if (options.skipExisting && fs.existsSync(outputPath)) {
+      try {
+        const prior = JSON.parse(fs.readFileSync(outputPath, 'utf-8'));
+        for (const p of prior.results || []) {
+          priorResults.set(p.paperId, p);
+        }
+        console.log(
+          `Skip-existing: loaded ${priorResults.size} papers from previous run`
+        );
+      } catch {
+        console.warn('Could not read previous output; starting fresh');
+      }
+    }
 
     const papers = await this.loadPapersFromDataset(
       datasetPath,
@@ -371,6 +410,19 @@ export class BatchEvaluationRunner {
     for (let i = 0; i < papers.length; i++) {
       const paper = papers[i];
       console.log(`\n[${i + 1}/${papers.length}] Processing ${paper.paperId}`);
+
+      // Resume: if this paper already succeeded fully, reuse it and skip the call.
+      if (options.skipExisting && priorResults.has(paper.paperId)) {
+        const prev = priorResults.get(paper.paperId)!;
+        const hasFailures =
+          !!prev.error || prev.questions.some((q) => !q.success);
+        if (!hasFailures && prev.questions.length > 0) {
+          console.log(`  Already complete — skipping (${prev.questions.length} questions)`);
+          results.push(prev);
+          continue;
+        }
+        console.log(`  Previous run had failures — re-evaluating`);
+      }
 
       const templateQuestions = this.loadQuestionsFromTemplate();
       let allQuestions = this.mapQuestionsToGroundTruth(

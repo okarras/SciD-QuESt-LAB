@@ -19,6 +19,7 @@ interface CLIOptions {
   model?: string;
   modelTag?: string;
   withContext?: boolean;
+  fullContent?: boolean;
   skipExisting?: boolean;
   onlyQuestions?: string[];
   test?: boolean;
@@ -63,6 +64,9 @@ function parseArgs(): CLIOptions {
         break;
       case '--with-context':
         options.withContext = true;
+        break;
+      case '--full-content':
+        options.fullContent = true;
         break;
       case '--skip-existing':
         options.skipExisting = true;
@@ -176,6 +180,7 @@ async function main() {
     const runner = new FrontendExactEvaluationRunner(options.backend, {
       useBERTScore,
       templatePath,
+      fullContent: options.fullContent,
     });
 
     if (options.test) {
@@ -243,6 +248,7 @@ async function main() {
           modelTag: options.modelTag || options.model,
           backendUrl: options.backend,
           onlyQuestions: options.onlyQuestions,
+          skipExisting: options.skipExisting,
         }
       );
 

@@ -14,6 +14,9 @@ Output: *-final.json files
 import json, os, sys, glob, re
 import torch
 
+# Strict correctness threshold — the only threshold in the project.
+STRICT_BERT = 0.7
+
 # BERTScore (lazy)
 _bert_scorer = None
 
@@ -175,12 +178,12 @@ def score_suggestion(text, gt_val, qtype):
     elif qtype == 'text':
         score = triple_max_score(text, str(gt_val))
         result['bertScore'] = score
-        result['isCorrect'] = score >= 0.5
+        result['isCorrect'] = score >= STRICT_BERT
     elif qtype in ('multi_select', 'repeat_text'):
         score = triple_max_score(text, str(gt_val))
         result['bertScore'] = score
         result['f1Score'] = score  # approximate
-        result['isCorrect'] = score >= 0.5
+        result['isCorrect'] = score >= STRICT_BERT
     return result
 
 
@@ -242,7 +245,7 @@ def fair_rescore_standalone(question, all_gt_values):
             old_correct = s.get('isCorrect', False)
             old_bert = s.get('bertScore')
 
-            s['isCorrect'] = best_score >= 0.5
+            s['isCorrect'] = best_score >= STRICT_BERT
             s['bertScore'] = best_score
             # Remove f1Score if present (repeat_text now uses bertScore)
             s.pop('f1Score', None)

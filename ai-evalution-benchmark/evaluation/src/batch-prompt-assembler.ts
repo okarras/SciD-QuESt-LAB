@@ -22,49 +22,21 @@ export interface BatchPrompt {
   };
 }
 
-const DEFAULT_BATCH_SYSTEM_PROMPT = `You are an AI assistant analyzing an academic paper. You will be given the full text of a paper and a list of questions to answer.
+const DEFAULT_BATCH_SYSTEM_PROMPT = `You are a research data extractor. Read the paper and answer each question based on its content.
 
-For EACH question, provide exactly 3 ranked suggestions. Each suggestion must include:
-- The answer text
-- A confidence score (0.0 to 1.0)
-- Supporting evidence with page numbers and exact text excerpts from the paper
+For each question, give 3 ranked suggestions (most to least likely). Always commit to a best answer — infer from the paper when it is not stated explicitly; do not refuse or say the information is missing.
 
-CRITICAL RULES:
-- Answer ALL questions in a single JSON response
-- For questions with "Options:", your answer MUST be one of the listed options exactly
-- For boolean questions (yes/no), answer with "yes" or "no"
-- For text questions, provide a concise factual answer based on the paper
-- For multi-select questions, provide comma-separated values from the options
-- Extract EXACT text from the PDF for evidence excerpts
-- If the paper does not contain information for a question, still provide your best inference
+Answer rules:
+- If options are listed, the answer MUST be exactly one of them (match an option, do not use the paper's raw wording). For multi_select, give a comma-separated subset of the options that apply.
+- boolean → "yes" or "no".
+- text → a short answer that matches how the field is normally expressed (singular noun form, no trailing punctuation).
 
-Respond with ONLY valid JSON in this exact format:
-{
-  "answers": {
-    "<question_id>": {
-      "suggestions": [
-        {
-          "rank": 1,
-          "text": "your answer",
-          "confidence": 0.95,
-          "evidence": [{ "pageNumber": 3, "excerpt": "exact text from paper" }]
-        },
-        {
-          "rank": 2,
-          "text": "alternative answer",
-          "confidence": 0.7,
-          "evidence": [{ "pageNumber": 5, "excerpt": "supporting text" }]
-        },
-        {
-          "rank": 3,
-          "text": "another possibility",
-          "confidence": 0.4,
-          "evidence": []
-        }
-      ]
-    }
-  }
-}`;
+Evidence: { pageNumber, excerpt } where excerpt is a 10-50 word quote copied exactly from the paper (use the [PAGE N] markers). EVERY suggestion — including ranks 2 and 3 — must include at least one evidence item that supports that specific answer. The answer itself follows the rules above.
+
+confidence: 0.9 explicitly stated, 0.5 inferred, 0.2 weak guess.
+
+Return ONLY JSON (no markdown, no extra text):
+{"answers":{"<question_id>":{"suggestions":[{"rank":1,"text":"","confidence":0.9,"evidence":[{"pageNumber":1,"excerpt":""}]},{"rank":2,"text":"","confidence":0.5,"evidence":[{"pageNumber":1,"excerpt":""}]},{"rank":3,"text":"","confidence":0.2,"evidence":[{"pageNumber":1,"excerpt":""}]}]}}}`;
 
 export class BatchPromptAssembler {
   private systemPrompt: string;
@@ -78,7 +50,8 @@ export class BatchPromptAssembler {
       this.systemPrompt = DEFAULT_BATCH_SYSTEM_PROMPT;
     }
     this.temperature = evalConfig?.evaluation?.temperature ?? 0.3;
-    this.maxTokens = evalConfig?.evaluation?.batch_max_tokens ?? 8000;
+    // 0 or undefined means no limit — let the model use its full completion budget
+    this.maxTokens = evalConfig?.evaluation?.batch_max_tokens ?? 0;
   }
 
   assembleBatchPrompt(
@@ -120,28 +93,29 @@ export class BatchPromptAssembler {
   ): string {
     let prompt = '';
 
+    // Long document first (best practice for long-context models)
+    prompt += `<paper`;
     if (paperTitle) {
-      prompt += `Paper Title: ${paperTitle}\n\n`;
+      prompt += ` title="${paperTitle.replace(/"/g, "'")}"`;
     }
+    prompt += `>\n${pdfContent}\n</paper>\n\n`;
 
-    prompt += `--- PAPER CONTENT ---\n${pdfContent}\n--- END OF PAPER ---\n\n`;
-
-    prompt += `--- QUESTIONS (${questions.length} total) ---\n\n`;
-
+    // Questions block
+    prompt += `<questions count="${questions.length}">\n`;
     for (let i = 0; i < questions.length; i++) {
       const q = questions[i];
-      prompt += `${i + 1}. [id: ${q.id}] ${q.text}\n`;
-      prompt += `   Type: ${q.type}\n`;
-
+      let line = `${i + 1}. id="${q.id}" type="${q.type}" — ${q.text}`;
       if (q.options && q.options.length > 0) {
-        prompt += `   Options: ${q.options.join(', ')}\n`;
+        line += `\n   options: ${q.options.join(', ')}`;
       }
-
-      prompt += '\n';
+      prompt += line + '\n';
     }
+    prompt += `</questions>\n\n`;
 
-    prompt += `--- END OF QUESTIONS ---\n\n`;
-    prompt += `Answer ALL ${questions.length} questions above. Return a single JSON object with an "answers" key containing all question IDs as keys.`;
+    // Task instruction re-anchored at the very bottom (freshest in attention)
+    prompt += `Answer all ${questions.length} questions above using only the content in <paper>. `;
+    prompt += `Return a single JSON object with an "answers" key whose keys are the exact question ids. `;
+    prompt += `Follow the confidence rubric and evidence rules. Output ONLY the JSON.`;
 
     return prompt;
   }

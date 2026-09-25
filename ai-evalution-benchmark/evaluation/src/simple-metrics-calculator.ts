@@ -77,12 +77,12 @@ export interface EvaluationSummary {
 
 // Default thresholds used when no eval config is provided
 const DEFAULT_METRICS: Record<string, MetricConfig> = {
-  text: { metric: 'bertscore', threshold: 0.5 },
+  text: { metric: 'bertscore', threshold: 0.7 },
   single_select: { metric: 'exact_match', threshold: 1.0 },
   select: { metric: 'exact_match', threshold: 1.0 },
   boolean: { metric: 'exact_match', threshold: 1.0 },
-  multi_select: { metric: 'f1', threshold: 0.3 },
-  repeat_text: { metric: 'bertscore_best_match', threshold: 0.5 },
+  multi_select: { metric: 'f1', threshold: 0.75 },
+  repeat_text: { metric: 'bertscore_best_match', threshold: 0.7 },
   text_object: { metric: 'exact_match', threshold: 1.0 },
   url: { metric: 'exact_match', threshold: 1.0 },
 };
@@ -107,8 +107,8 @@ export class SimpleMetricsCalculator {
     const normalized = questionType.toLowerCase();
     const config = this.metricsConfig[normalized];
     if (config) return config.threshold;
-    // Fallback
-    return 0.5;
+    // Fallback (strict)
+    return 0.7;
   }
 
   async calculateQuestionMetrics(

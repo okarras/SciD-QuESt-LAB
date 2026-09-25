@@ -1,12 +1,21 @@
 #!/usr/bin/env python3
 """
 Export evaluation results to Excel
+
+Usage:
+  python3 export-excel.py                 # uses the RESULT_FILES config below
+  python3 export-excel.py --run-tag run2  # auto-discovers results-<model>-run2.json
 """
 import json
 import re
+import sys
+import argparse
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
+
+# Shared canonical scoring config — keep the Excel identical to compare.py
+import eval_common as EC
 
 # Strip illegal XML characters that openpyxl rejects
 _ILLEGAL_XML_RE = re.compile(
@@ -20,39 +29,44 @@ def sanitize(value):
     return value
 
 
-# Config (same as compare.py)
-RESULT_FILES = {
-    'GPT-3.5': [
-        'results-gpt35-0-75-final.json',
-        'results-gpt35-75-75-final.json',
-    ],
-    'GPT-4o-mini': [
-        'results-gpt4omini-0-75-final.json',
-        'results-gpt4omini-75-75-final.json',
-    ],
-    'GPT-4o-mini+Ctx': [
-        'results-gpt4o-context-0-75-final.json',
-        'results-gpt4o-context-75-75-final.json',
-    ],
+# Model registry: display name -> (short label, filename tag).
+# Must match the tags used in run-benchmark.sh.
+MODEL_REGISTRY = {
+    'Gemini-3.8-Flash': ('Gem-3.8F', 'gemini38flash'),
+    'DeepSeek-V4-Pro': ('DeepSeek', 'deepseekv4pro'),
+    'GPT-5.6-Luna': ('GPT-Luna', 'gpt56luna'),
+    'GLM-5.2': ('GLM', 'glm52'),
+    'GPT-6-Astra': ('Astra', 'astra'),
+    'Gemini-3.1-Pro': ('Gem-3.1P', 'gemini31pro'),
+    'Kimi-K3': ('Kimi', 'kimik3'),
+    'Claude-Opus-5': ('Opus5', 'opus5'),
+    'Claude-Sonnet-5': ('Sonnet5', 'sonnet5'),
+    'Claude-Fable-5.1': ('Fable', 'fable51'),
+    # Older / smaller models (small-context experiment; all >=32K so batch fits)
+    'GPT-4o-mini': ('GPT4o-mini', 'gpt4omini'),
+    'Qwen-2.5-7B': ('Qwen25-7B', 'qwen257b'),
+    'Mistral-Small-24B': ('Mistral24B', 'mistralsmall24b'),
 }
-SHORT = {'GPT-3.5': '3.5', 'GPT-4o-mini': '4o-mini', 'GPT-4o-mini+Ctx': '+Ctx'}
 
+# Default config (used when --run-tag is not passed)
+RESULT_FILES = {
+    'Gemini-3.8-Flash': ['results-gemini38flash-v3.json'],
+    'DeepSeek-V4-Pro': ['results-deepseekv4pro-v3.json'],
+    'GPT-5.6-Luna': ['results-gpt56luna-v3.json'],
+    'GLM-5.2': ['results-glm52-v3.json'],
+}
+SHORT = {name: short for name, (short, _tag) in MODEL_REGISTRY.items()}
+
+# Single scoring standard — imported from eval_common so the Excel and the
+# comparison tool can never diverge. Strict thresholds only.
+STRICT_BERT = EC.STRICT_BERT
+STRICT_F1 = EC.STRICT_F1
 THRESHOLDS = [
-    {'name': 'Lenient (BERT>=0.5, F1>=0.5)', 'bert': 0.5, 'f1': 0.5},
-    {'name': 'Strict (BERT>=0.7, F1>=0.75)', 'bert': 0.7, 'f1': 0.75},
+    {'name': f'Strict (BERT>={STRICT_BERT}, F1>={STRICT_F1})', 'bert': STRICT_BERT, 'f1': STRICT_F1},
 ]
 
-SENTINEL_VALUES = {
-    'no question', 'no questions', 'no type', 'no types',
-    'no method', 'no methods', 'no collection', 'no analysis',
-}
-EXCLUDED_QUESTIONS = {
-    'data_urls',
-    'answer_highlighted',       
-    'descriptive_stats_used',  
-    'inferential_stats_used',  
-    'ml_used',               
-}
+SENTINEL_VALUES = EC.SENTINEL_VALUES
+EXCLUDED_QUESTIONS = EC.EXCLUDED_QUESTIONS
 
 NO_SIBLING_QUESTIONS = {
     'answer_highlighted', 'data_type', 'descriptive_stats_used',
@@ -61,23 +75,9 @@ NO_SIBLING_QUESTIONS = {
     'answer_hidden', 
 }
 
-# Manual validation overrides (same as compare.py)
-FORCE_CORRECT = {
-    ('R194401', 'hypothesis_statement'): {'GPT-4o-mini+Ctx'},
-    ('R254521', 'method_name_custom'):   {'GPT-4o-mini', 'GPT-4o-mini+Ctx'},
-    ('R194431', 'method_name_custom'):   {'GPT-4o-mini', 'GPT-4o-mini+Ctx'},
-    ('R195857', 'method_name_custom'):   {'GPT-4o-mini+Ctx'},
-    ('R1550970', 'method_name_custom'):  {'GPT-4o-mini+Ctx'},
-    ('R584056', 'method_name_custom'):   {'GPT-4o-mini+Ctx'},
-    ('R228262', 'method_name_custom'):   {'GPT-4o-mini'},
-    ('R211121', 'method_name_custom'):   {'GPT-4o-mini'},
-    ('R583135', 'ml_algorithms'):        {'GPT-3.5', 'GPT-4o-mini', 'GPT-4o-mini+Ctx'},
-    ('R220605', 'ml_algorithms'):        {'GPT-4o-mini', 'GPT-4o-mini+Ctx'},
-    ('R199123', 'statistical_tests'):    {'GPT-4o-mini+Ctx'},
-}
-EXCLUDE_PAIRS = {
-    ('R211145', 'subq_text'),
-}
+# Manual validation overrides (none for this run)
+FORCE_CORRECT = {}
+EXCLUDE_PAIRS = set()
 
 OUTPUT_FILE = 'evaluation-results.xlsx'
 
@@ -92,13 +92,8 @@ THIN_BORDER = Border(
 )
 
 
-def is_sentinel(value):
-    if value is None:
-        return False
-    if isinstance(value, list):
-        real = [v for v in value if str(v).lower().strip() not in SENTINEL_VALUES and str(v).strip()]
-        return len(real) == 0
-    return str(value).lower().strip() in SENTINEL_VALUES
+# Delegate to the shared canonical implementation.
+is_sentinel = EC.is_sentinel
 
 
 def format_evidence(evidence_list):
@@ -145,6 +140,25 @@ def load_full_questions(paths):
                     top_s1 = next((s for s in top_suggestions if s.get('position') == 1), top_suggestions[0])
                     evidence = format_evidence(top_s1.get('evidence', []))
 
+                # Strict any-of-3: is any of the (up to 3) suggestions correct
+                # under the strict thresholds?
+                any_correct = False
+                for sug in m['suggestions']:
+                    sqt = qt
+                    if sqt in ('boolean', 'select', 'single_select', 'text_object', 'url'):
+                        if sug.get('isCorrect'):
+                            any_correct = True
+                    elif sqt == 'text':
+                        bs = sug.get('bertScore')
+                        if bs is not None and bs >= STRICT_BERT:
+                            any_correct = True
+                    elif sqt == 'multi_select':
+                        f1v = sug.get('f1Score')
+                        if f1v is not None and f1v >= STRICT_F1:
+                            any_correct = True
+                    if any_correct:
+                        break
+
                 qs[key] = {
                     'paperId': pid,
                     'questionId': q['questionId'],
@@ -155,6 +169,7 @@ def load_full_questions(paths):
                     'f1Score': s1.get('f1Score'),
                     'accuracy': s1.get('accuracy'),
                     'isCorrect': s1.get('isCorrect', False),
+                    'anyCorrect': any_correct,
                     'evidence': evidence,
                 }
     return qs
@@ -234,8 +249,22 @@ def write_summary_sheet(wb, labels, all_data, common):
             ws.cell(row=row, column=ci).alignment = Alignment(horizontal='center')
         row += 1
 
-        # Any correct
+        # Any correct (S1 OR S2 OR S3)
         ws.cell(row=row, column=1, value='Any Correct (S1∨S2∨S3)')
+        for ci, label in enumerate(labels, 2):
+            correct = 0
+            for k in common:
+                q = all_data[label][k]
+                # any-of-3: q stores only S1 in this loader, so fall back to
+                # metrics anyCorrect if present, else S1 correctness.
+                any_ok = q.get('anyCorrect')
+                if any_ok is None:
+                    any_ok = is_correct_at(q, thresh['bert'], thresh['f1'])
+                if any_ok:
+                    correct += 1
+            pct = correct / len(common) * 100
+            ws.cell(row=row, column=ci, value=f'{pct:.1f}%')
+            ws.cell(row=row, column=ci).alignment = Alignment(horizontal='center')
         row += 2
 
     auto_width(ws)
@@ -345,7 +374,7 @@ def write_all_predictions_sheet(wb, labels, all_data, common):
     headers = ['Paper ID', 'Question ID', 'Type', 'Ground Truth']
     for label in labels:
         s = SHORT[label]
-        headers += [f'{s} Prediction', f'{s} Evidence', f'{s} Score', f'{s} Lenient', f'{s} Strict']
+        headers += [f'{s} Prediction', f'{s} Evidence', f'{s} Score', f'{s} Correct']
     for c, h in enumerate(headers, 1):
         ws.cell(row=1, column=c, value=h)
     style_header_row(ws, 1, len(headers))
@@ -368,8 +397,7 @@ def write_all_predictions_sheet(wb, labels, all_data, common):
             pred = str(q['prediction'])[:500]
             evidence = q.get('evidence', '')
             sc = score_value(q)
-            lenient = is_correct_at(q, 0.5, 0.5)
-            strict = is_correct_at(q, 0.7, 0.75)
+            correct = is_correct_at(q, STRICT_BERT, STRICT_F1)
 
             ws.cell(row=row, column=col, value=sanitize(pred))
             ev_cell = ws.cell(row=row, column=col + 1, value=sanitize(evidence[:1000]) if evidence else '')
@@ -377,22 +405,18 @@ def write_all_predictions_sheet(wb, labels, all_data, common):
             ws.cell(row=row, column=col + 2, value=round(sc, 4) if sc is not None else '')
             ws.cell(row=row, column=col + 2).alignment = Alignment(horizontal='center')
 
-            lenient_cell = ws.cell(row=row, column=col + 3, value='✓' if lenient else '✗')
-            lenient_cell.fill = CORRECT_FILL if lenient else INCORRECT_FILL
-            lenient_cell.alignment = Alignment(horizontal='center')
+            correct_cell = ws.cell(row=row, column=col + 3, value='✓' if correct else '✗')
+            correct_cell.fill = CORRECT_FILL if correct else INCORRECT_FILL
+            correct_cell.alignment = Alignment(horizontal='center')
 
-            strict_cell = ws.cell(row=row, column=col + 4, value='✓' if strict else '✗')
-            strict_cell.fill = CORRECT_FILL if strict else INCORRECT_FILL
-            strict_cell.alignment = Alignment(horizontal='center')
-
-            col += 5
+            col += 4
 
         row += 1
 
     auto_width(ws, max_width=60)
     for label_idx in range(len(labels)):
-        pred_col = 5 + label_idx * 5
-        ev_col = 6 + label_idx * 5
+        pred_col = 5 + label_idx * 4
+        ev_col = 6 + label_idx * 4
         ws.column_dimensions[get_column_letter(pred_col)].width = 60
         ws.column_dimensions[get_column_letter(ev_col)].width = 50
 
@@ -419,8 +443,9 @@ def write_deep_analysis_sheet(wb, labels, all_data, common):
         qt = all_data[labels[0]][keys[0]]['questionType']
         n = len(keys)
 
-        correct_keys = [k for k in keys if is_correct_at(all_data['GPT-4o-mini'][k], 0.7, 0.75)]
-        incorrect_keys = [k for k in keys if not is_correct_at(all_data['GPT-4o-mini'][k], 0.7, 0.75)]
+        ref_label = labels[0]
+        correct_keys = [k for k in keys if is_correct_at(all_data[ref_label][k], 0.7, 0.75)]
+        incorrect_keys = [k for k in keys if not is_correct_at(all_data[ref_label][k], 0.7, 0.75)]
 
         ws.cell(row=row, column=1, value=qid)
         ws.cell(row=row, column=1).font = Font(bold=True)
@@ -467,21 +492,41 @@ def write_deep_analysis_sheet(wb, labels, all_data, common):
 
 
 def main():
+    global RESULT_FILES, OUTPUT_FILE
+
+    parser = argparse.ArgumentParser(description='Export evaluation results to Excel')
+    parser.add_argument('--run-tag', type=str,
+                        help='Build RESULT_FILES from results-<tag>-<run-tag>.json for all registered models')
+    parser.add_argument('--output', type=str, help='Output xlsx path')
+    args = parser.parse_args()
+
+    if args.run_tag:
+        import os
+        RESULT_FILES = {}
+        for name, (_short, tag) in MODEL_REGISTRY.items():
+            # Prefer the rescored file (real BERTScore/SBERT metrics) over the
+            # raw file (live eval has BERTScore off by design).
+            rescored = f'results-{tag}-{args.run_tag}-rescored.json'
+            raw = f'results-{tag}-{args.run_tag}.json'
+            if os.path.exists(rescored):
+                RESULT_FILES[name] = [rescored]
+            elif os.path.exists(raw):
+                print(f'  (WARNING {name}: using RAW {raw} — no rescored file found; run rescore-all.py first)')
+                RESULT_FILES[name] = [raw]
+            else:
+                print(f'  (skip {name}: {rescored} / {raw} not found)')
+        if not RESULT_FILES:
+            print(f'No result files found for run-tag "{args.run_tag}"')
+            sys.exit(1)
+        OUTPUT_FILE = args.output or f'evaluation-results-{args.run_tag}.xlsx'
+    elif args.output:
+        OUTPUT_FILE = args.output
+
     labels = list(RESULT_FILES.keys())
     all_data = {}
     for label, paths in RESULT_FILES.items():
         all_data[label] = load_full_questions(paths)
         print(f"{label}: {len(all_data[label])} questions")
-
-    ctx_label = 'GPT-4o-mini+Ctx'
-    mini_label = 'GPT-4o-mini'
-    if ctx_label in all_data and mini_label in all_data:
-        copied = 0
-        for key, q in all_data[mini_label].items():
-            if q['questionId'] in NO_SIBLING_QUESTIONS:
-                all_data[ctx_label][key] = q
-                copied += 1
-        print(f"  Copied {copied} no-sibling questions from {mini_label} → {ctx_label}")
 
     common = set(all_data[labels[0]].keys())
     for label in labels[1:]:
@@ -499,6 +544,15 @@ def main():
                 q['bertScore'] = 1.0
 
     print(f"Common: {len(common)}")
+
+    if len(common) == 0:
+        print("\nERROR: No questions are common across ALL models.")
+        print("This usually means one or more models had many failed questions.")
+        print("Per-model successful counts:")
+        for label in labels:
+            print(f"  {label}: {len(all_data[label])}")
+        print("\nFix the failing model(s) with a --skip-existing re-run, then retry.")
+        sys.exit(1)
 
     wb = Workbook()
 

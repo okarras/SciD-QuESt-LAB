@@ -80,12 +80,7 @@ export class SiblingContextProvider {
 SIBLING QUESTIONS (Already Answered):
 ${siblingLines}
 
-IMPORTANT: Generate suggestions that:
-- Are CONSISTENT and ALIGNED with sibling answers
-- Complement and build upon the information in sibling answers
-- Maintain the same level of detail and perspective as siblings
-- Ensure coherence across all questions at this level
-- Avoid contradicting information provided in sibling answers
+IMPORTANT: Your answer must stay consistent with these already-answered sibling questions and must not contradict them.
 `;
   }
 }

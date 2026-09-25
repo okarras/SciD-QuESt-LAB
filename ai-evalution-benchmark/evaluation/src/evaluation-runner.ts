@@ -103,11 +103,20 @@ export class FrontendExactEvaluationRunner {
   private siblingContextProvider: SiblingContextProvider;
   private metricsCalculator: SimpleMetricsCalculator;
   private evalConfig: EvalConfig;
+  private useFullContent: boolean;
 
   constructor(
     backendUrl: string = 'http://localhost:5001',
-    options: { useBERTScore?: boolean; templatePath?: string } = {}
+    options: {
+      useBERTScore?: boolean;
+      templatePath?: string;
+      fullContent?: boolean;
+    } = {}
   ) {
+    // When true, per-question mode sends the WHOLE paper instead of semantic
+    // chunks (used to isolate the effect of chunking).
+    this.useFullContent = options.fullContent ?? false;
+
     // Load template and eval config first
     this.templateLoader = new FrontendTemplateLoader(options.templatePath);
     const evalConfigLoader = this.templateLoader.getEvalConfigLoader();
@@ -181,12 +190,25 @@ export class FrontendExactEvaluationRunner {
         );
 
         try {
-          const questionPdfResult =
-            await this.pdfExtractor.getChunkedContentForQuestion(
-              baseResult.structuredDocument!,
-              question.text,
-              4000
-            );
+          let questionPdfResult;
+          if (this.useFullContent) {
+            // Whole paper, no chunking — join all pages with [PAGE N] markers.
+            const fullText = baseResult.structuredDocument!.pages
+              .map((p) => `[PAGE ${p.pageNumber}]\n${p.text}`)
+              .join('\n\n');
+            questionPdfResult = { success: true, pdfContent: fullText } as {
+              success: boolean;
+              pdfContent: string;
+              error?: string;
+            };
+          } else {
+            questionPdfResult =
+              await this.pdfExtractor.getChunkedContentForQuestion(
+                baseResult.structuredDocument!,
+                question.text,
+                4000
+              );
+          }
 
           if (!questionPdfResult.success) {
             throw new Error(
@@ -195,7 +217,7 @@ export class FrontendExactEvaluationRunner {
           }
 
           console.log(
-            `Question-specific content: ${questionPdfResult.pdfContent.length} chars`
+            `Question content: ${questionPdfResult.pdfContent.length} chars${this.useFullContent ? ' (full paper)' : ' (chunked)'}`
           );
 
           const questionInfo: ProcessedQuestionInfo =

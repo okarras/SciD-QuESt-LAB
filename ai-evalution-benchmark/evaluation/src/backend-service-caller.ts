@@ -78,20 +78,53 @@ export class FrontendBackendCaller {
     const requestTime = Date.now();
 
     try {
-      const request = {
+      // Resolve maxTokens: prompt value takes precedence.
+      // A value of 0 (or explicit undefined) means "no limit" — omit it entirely.
+      const resolvedMaxTokens =
+        prompt.maxTokens === 0
+          ? undefined
+          : prompt.maxTokens || this.maxTokens;
+
+      const request: {
+        prompt: string;
+        systemContext: string;
+        provider: string;
+        model: string;
+        temperature: number;
+        maxTokens?: number;
+      } = {
         prompt: prompt.userPrompt,
         systemContext: prompt.systemPrompt,
         provider: this.aiProvider,
         model: this.aiModel,
         temperature: prompt.temperature || this.temperature,
-        maxTokens: prompt.maxTokens || this.maxTokens,
       };
+
+      if (resolvedMaxTokens !== undefined) {
+        request.maxTokens = resolvedMaxTokens;
+      }
 
       console.log(`Calling backend: ${this.backendUrl}/api/ai/generate`);
       console.log(`Prompt: ${request.prompt.substring(0, 100)}...`);
 
-      const { response: aiResponse, rawResponse } =
+      let { response: aiResponse, rawResponse } =
         await this.makeAPICallWithRawResponse(request);
+
+      // Some reasoning models (e.g. DeepSeek) occasionally return an empty
+      // answer (reasoning-only). Retry up to 2 times when the text is empty.
+      let emptyRetries = 0;
+      while (
+        (!aiResponse?.text || String(aiResponse.text).trim().length === 0) &&
+        emptyRetries < 2
+      ) {
+        emptyRetries++;
+        console.log(
+          `Empty response from model — retrying (${emptyRetries}/2)...`
+        );
+        const retry = await this.makeAPICallWithRawResponse(request);
+        aiResponse = retry.response;
+        rawResponse = retry.rawResponse;
+      }
 
       const response = this.convertAIResponseToSuggestions(
         aiResponse,
@@ -265,15 +298,32 @@ export class FrontendBackendCaller {
   }> {
     const url = `${this.backendUrl}/api/ai/generate`;
 
-    const fetchResponse = await globalThis.fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-user-id': this.devUserId,
-        'x-user-email': this.devUserEmail,
-      },
-      body: JSON.stringify(request),
-    });
+    // Abort the request if it hangs. Reasoning models can be slow, so allow
+    // up to 5 minutes before giving up (so a hung connection doesn't block forever).
+    const timeoutMs = parseInt(process.env.REQUEST_TIMEOUT_MS || '300000');
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    let fetchResponse: Response;
+    try {
+      fetchResponse = await globalThis.fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': this.devUserId,
+          'x-user-email': this.devUserEmail,
+        },
+        body: JSON.stringify(request),
+        signal: controller.signal,
+      });
+    } catch (err) {
+      clearTimeout(timer);
+      if (err instanceof Error && err.name === 'AbortError') {
+        throw new Error(`Request timed out after ${timeoutMs}ms`);
+      }
+      throw err;
+    }
+    clearTimeout(timer);
 
     const rawResponse = await fetchResponse.text();
 
@@ -431,18 +481,50 @@ export class FrontendBackendCaller {
               ? parseError.message
               : String(parseError)
           );
-          console.log(
-            `[DEBUG] Response text (first 500 chars):`,
-            responseText.substring(0, 500)
-          );
-          suggestions = [
-            {
-              rank: 1,
-              text: responseText,
-              confidence: 0.8,
-              evidence: [],
-            },
-          ];
+
+          // Salvage: the response may be valid JSON that got truncated (e.g.
+          // the model hit max_tokens mid-object). Extract each suggestion's
+          // "text"/"confidence" via regex so we still recover the answers
+          // instead of storing the raw JSON blob as the prediction.
+          const salvaged: Array<{
+            rank: number;
+            text: string;
+            confidence: number;
+            evidence: any[];
+          }> = [];
+          const textRe = /"text"\s*:\s*"((?:[^"\\]|\\.)*)"/g;
+          const confRe = /"confidence"\s*:\s*([0-9.]+)/g;
+          let tm: RegExpExecArray | null;
+          const texts: string[] = [];
+          while ((tm = textRe.exec(responseText)) !== null) {
+            texts.push(tm[1].replace(/\\"/g, '"').replace(/\\n/g, ' '));
+          }
+          const confs: number[] = [];
+          let cm: RegExpExecArray | null;
+          while ((cm = confRe.exec(responseText)) !== null) {
+            confs.push(parseFloat(cm[1]));
+          }
+          if (texts.length > 0) {
+            for (let i = 0; i < texts.length; i++) {
+              salvaged.push({
+                rank: i + 1,
+                text: texts[i],
+                confidence: confs[i] ?? 0.8 - i * 0.2,
+                evidence: [],
+              });
+            }
+            console.log(
+              `[DEBUG] Salvaged ${salvaged.length} suggestion(s) from malformed/truncated JSON`
+            );
+            suggestions = salvaged;
+          } else {
+            console.log(
+              `[DEBUG] Could not salvage; storing raw text as single suggestion`
+            );
+            suggestions = [
+              { rank: 1, text: responseText, confidence: 0.8, evidence: [] },
+            ];
+          }
         }
       }
 
