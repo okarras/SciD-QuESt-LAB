@@ -18,6 +18,9 @@ export default function Header({ onTryDemo }: HeaderProps) {
           <a href="#how-it-works" className="header-link">
             <span>Architecture</span>
           </a>
+          <a href="#benchmarking" className="header-link">
+            <span>Benchmarking</span>
+          </a>
           <a href="#code" className="header-link">
             <span>Quick Start</span>
           </a>

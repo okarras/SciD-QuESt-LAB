@@ -4,20 +4,28 @@ import Header from './components/Header';
 import HeroBanner from './components/HeroBanner';
 import FeaturesGrid from './components/FeaturesGrid';
 import HowItWorks from './components/HowItWorks';
+import Benchmarking from './components/Benchmarking';
 import CodeExamples from './components/CodeExamples';
 import LiveDemo from './components/LiveDemo';
 import ApiReference from './components/ApiReference';
+import BenchmarkingDetailPage from './components/BenchmarkingDetailPage';
 import Footer from './components/Footer';
 
-export default function App() {
-  const [view, setView] = useState<'landing' | 'demo'>('landing');
+type View = 'landing' | 'demo' | 'benchmarking-detail';
 
-  // Simple hash router to toggle standalone demo view
+export default function App() {
+  const [view, setView] = useState<View>('landing');
+
+  // Simple hash router to toggle standalone demo / benchmarking detail views
   useEffect(() => {
     const handleHash = () => {
-      if (window.location.hash === '#demo') {
+      const hash = window.location.hash;
+      if (hash === '#demo') {
         setView('demo');
         window.scrollTo(0, 0);
+      } else if (hash.toLowerCase() === '#benchmarking/details') {
+        setView('benchmarking-detail');
+        window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
       } else {
         setView('landing');
       }
@@ -36,8 +44,24 @@ export default function App() {
     window.location.hash = '';
   };
 
+  const navigateToBenchmarking = () => {
+    window.location.hash = '#benchmarking';
+  };
+
   if (view === 'demo') {
     return <LiveDemo onBack={navigateToLanding} />;
+  }
+
+  if (view === 'benchmarking-detail') {
+    return (
+      <>
+        <Header onTryDemo={navigateToDemo} />
+        <main>
+          <BenchmarkingDetailPage onBack={navigateToBenchmarking} />
+        </main>
+        <Footer />
+      </>
+    );
   }
 
   return (
@@ -47,6 +71,7 @@ export default function App() {
         <HeroBanner onTryDemo={navigateToDemo} />
         <FeaturesGrid />
         <HowItWorks />
+        <Benchmarking />
         <CodeExamples />
         <ApiReference />
       </main>
