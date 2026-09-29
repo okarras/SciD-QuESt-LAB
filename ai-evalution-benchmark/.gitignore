@@ -38,6 +38,15 @@ logs/
 results/
 !results/.gitkeep
 
+# Generated evaluation artifacts (raw + rescored result dumps, Excel exports,
+# inspection dumps/reports, logs). Regenerable from the runners + rescore-all.py.
+evaluation/results-*.json
+evaluation/evaluation-results-*.xlsx
+evaluation/inspection-*.json
+evaluation/inspection-report*.md
+evaluation/raw-prompt-response*.txt
+*.log
+
 # Environment Variables
 .env
 
