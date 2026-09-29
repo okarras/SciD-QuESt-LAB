@@ -260,8 +260,10 @@ class SPARQLFetcher:
                 elif isinstance(field_def, dict):
                     sub_type = field_def.get("type")
                     if sub_type == "conditional":
-                        obj[output_key] = self._resolve_conditional(row, field_def)
-                        has_value = True
+                        resolved = self._resolve_conditional(row, field_def)
+                        obj[output_key] = resolved
+                        if resolved:
+                            has_value = True
                     else:
                         source = field_def.get("source_field", "")
                         value = row.get(source)

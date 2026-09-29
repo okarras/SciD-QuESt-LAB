@@ -29,19 +29,46 @@ class PDFDownloader:
         try:
             if not doi:
                 return False
-            pdf_url = self._resolve_url(doi)
-            if not pdf_url:
-                return False
-            content = self._download(pdf_url)
-            if not content or not content.startswith(b'%PDF-'):
-                return False
-            Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-            Path(output_path).write_bytes(content)
-            return self._validate(output_path)
+            for pdf_url in self._candidate_urls(doi):
+                if not pdf_url:
+                    continue
+                content = self._download(pdf_url)
+                if content and content.startswith(b'%PDF-'):
+                    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+                    Path(output_path).write_bytes(content)
+                    if self._validate(output_path):
+                        return True
+            return False
         except:
             return False
+
+    def _candidate_urls(self, doi: str):
+        """Yield candidate PDF URLs in priority order (OA, then publisher)."""
+        if self.unpaywall_email:
+            yield self._unpaywall_url(doi)
+        yield self._semantic_scholar_url(doi)
+        yield self._openalex_url(doi)
+        if '/' in doi:
+            prefix = doi.split('/')[0]
+            if prefix == '10.1109':
+                yield self._ieee_url(doi)
+            elif prefix == '10.1007':
+                yield f"https://link.springer.com/content/pdf/{doi}.pdf"
+            elif prefix == '10.1145':
+                yield f"https://dl.acm.org/doi/pdf/{doi}"
+        yield self._doi_org_url(doi)
     
     def _resolve_url(self, doi: str) -> Optional[str]:
+        if self.unpaywall_email:
+            url = self._unpaywall_url(doi)
+            if url:
+                return url
+        url = self._semantic_scholar_url(doi)
+        if url:
+            return url
+        url = self._openalex_url(doi)
+        if url:
+            return url
         if '/' in doi:
             prefix = doi.split('/')[0]
             if prefix == '10.1109':
@@ -50,11 +77,35 @@ class PDFDownloader:
                 return f"https://link.springer.com/content/pdf/{doi}.pdf"
             elif prefix == '10.1145':
                 return f"https://dl.acm.org/doi/pdf/{doi}"
-        if self.unpaywall_email:
-            url = self._unpaywall_url(doi)
-            if url:
-                return url
         return self._doi_org_url(doi)
+
+    def _semantic_scholar_url(self, doi: str) -> Optional[str]:
+        """Semantic Scholar openAccessPdf (free, no key)."""
+        try:
+            self._wait()
+            r = self.session.get(
+                f"https://api.semanticscholar.org/graph/v1/paper/DOI:{doi}",
+                params={"fields": "openAccessPdf"}, timeout=self.timeout)
+            if r.status_code == 200:
+                pdf = (r.json() or {}).get("openAccessPdf") or {}
+                return pdf.get("url")
+        except Exception:
+            pass
+        return None
+
+    def _openalex_url(self, doi: str) -> Optional[str]:
+        """OpenAlex best open-access location pdf_url."""
+        try:
+            self._wait()
+            r = self.session.get(
+                f"https://api.openalex.org/works/https://doi.org/{doi}",
+                timeout=self.timeout)
+            if r.status_code == 200:
+                loc = (r.json() or {}).get("best_oa_location") or {}
+                return loc.get("pdf_url")
+        except Exception:
+            pass
+        return None
     
     def _ieee_url(self, doi: str) -> Optional[str]:
         try:

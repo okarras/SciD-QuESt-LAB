@@ -19,15 +19,15 @@ MODELS=(
 
 # A suffix appended to every output file (keeps runs from overwriting each
 # other). Example: RUN_TAG="perq" → results-gpt56luna-perq.json
-RUN_TAG="perqfull"
+RUN_TAG="full751"
 
-MODE="per-question"     # "batch" or "per-question"
-WITH_CONTEXT=true       # true = inject sibling ground-truth context (per-question only)
-FULL_CONTENT=true       # true = send whole paper instead of semantic chunks (per-question only)
+MODE="batch"            # "batch" or "per-question"
+WITH_CONTEXT=false      # true = inject sibling ground-truth context (per-question only)
+FULL_CONTENT=false      # true = send whole paper instead of semantic chunks (per-question only)
 DATASET="../dataset"    # path to dataset dir
 TEMPLATE="./templates/empirical_research_questionaire.json"
-LIMIT=25                # number of papers
-OFFSET=10               # skip first N papers (0 = start from beginning)
+LIMIT=751               # number of papers (full dataset)
+OFFSET=0                # skip first N papers (0 = start from beginning)
 BACKEND="http://localhost:5001"
 
 EXPORT_EXCEL=true       # true = generate Excel after all runs

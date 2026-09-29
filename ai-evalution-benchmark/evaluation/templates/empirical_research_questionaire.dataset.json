@@ -41,14 +41,14 @@
             "question": "question",
             "hidden": { "source_field": "question_hidden", "transform": "equals_1_to_bool" },
             "highlighted_question": { "source_field": "question_highlighted", "transform": "equals_1_to_bool" },
-            "type": { "source_field": "question_type_label", "default": "exploratory" }
+            "type": { "source_field": "question_type_label", "default": "" }
           },
           "nested": {
             "subquestions": {
               "group_key": "subquestion",
               "fields": {
                 "question": "subquestion",
-                "type": { "source_field": "subquestion_type_label", "default": "exploratory" }
+                "type": { "source_field": "subquestion_type_label", "default": "" }
               }
             }
           }
@@ -130,7 +130,7 @@
                     { "field": "hypothesis_type_null", "equals": "1", "value": "Null hypothesis" },
                     { "field": "hypothesis_type_alt", "equals": "1", "value": "Alternative hypothesis" }
                   ],
-                  "default": "Hypothesis"
+                  "default": ""
                 }
               }
             }

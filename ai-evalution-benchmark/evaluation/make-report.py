@@ -46,6 +46,79 @@ def metric_for(metrics_sugs, position):
     return next((m for m in metrics_sugs if m.get('position') == position), {})
 
 
+def prompt_info_block(paper):
+    """Summarise the prompt sent for this paper: length, tokens, and whether the
+    FULL paper (all pages) was provided vs a chunk. Also shows a short excerpt."""
+    import re
+    qs = [q for q in paper.get('questions', []) if q.get('success')]
+    if not qs:
+        return '> _(no successful questions — no prompt captured)_'
+
+    # In batch mode every question shares one prompt; in per-question mode each
+    # question has its own. Use the first successful question as representative,
+    # but report the range of content lengths so chunking is visible.
+    total_pages = (paper.get('pdfMetadata') or {}).get('totalPages')
+    lines = ['**Prompt / context sent:**', '']
+
+    li0 = qs[0].get('llmInteraction', {}) or {}
+    user_prompt = li0.get('userPrompt', '') or li0.get('fullPrompt', '') or ''
+
+    # content lengths across questions (differ if chunked)
+    clens = [ (q.get('metadata') or {}).get('pdfContentLength', 0) for q in qs ]
+    clens = [c for c in clens if c]
+    ptoks = [ (q.get('llmInteraction') or {}).get('promptTokens', 0) for q in qs ]
+    ptoks = [t for t in ptoks if t]
+
+    # how many distinct page markers appear in the representative prompt.
+    # Batch prompts use "[PAGE N]"; per-question prompts use "[Page N]".
+    pages_in_prompt = sorted(set(
+        int(m) for m in re.findall(r'\[page (\d+)\]', user_prompt, re.IGNORECASE)))
+    n_pages_prompt = len(pages_in_prompt)
+
+    # Signal 1: fraction of the paper's pages present in the prompt.
+    # Signal 2: whether content length varies across questions (chunking) vs is
+    #           constant (whole paper reused). Signal 2 is decisive.
+    content_varies = len(clens) > 1 and (max(clens) - min(clens) > 200)
+
+    if content_varies:
+        full = False  # per-question chunks: different slice each question
+    elif total_pages and n_pages_prompt:
+        full = (n_pages_prompt / total_pages) >= 0.9
+    elif '<paper' in user_prompt:
+        full = True
+    else:
+        full = None  # unknown
+
+    verdict = ('FULL PAPER' if full else 'CHUNK (partial)') if full is not None else 'UNKNOWN'
+    lines.append(f'- context type: **{verdict}**'
+                 + (f'  — {n_pages_prompt}/{total_pages} pages present in prompt'
+                    if (total_pages and n_pages_prompt) else ''))
+    if clens:
+        if min(clens) == max(clens):
+            lines.append(f'- PDF content sent: {clens[0]:,} chars (same for all questions)')
+        else:
+            lines.append(f'- PDF content sent: {min(clens):,}–{max(clens):,} chars '
+                         f'(varies per question → chunked)')
+    if ptoks:
+        if min(ptoks) == max(ptoks):
+            lines.append(f'- prompt tokens: ~{ptoks[0]:,}')
+        else:
+            lines.append(f'- prompt tokens: ~{min(ptoks):,}–{max(ptoks):,}')
+    lines.append(f'- prompt length: {len(user_prompt):,} chars'
+                 + ('  (shared batch prompt)' if len(clens) and min(clens) == max(clens) and len(qs) > 1 else ''))
+
+    # short excerpt of the prompt so you can eyeball what was sent
+    excerpt = user_prompt[:500].replace('\n', ' ')
+    lines.append('')
+    lines.append('<details><summary>prompt excerpt (first 500 chars)</summary>')
+    lines.append('')
+    lines.append('```')
+    lines.append(excerpt)
+    lines.append('```')
+    lines.append('</details>')
+    return '\n'.join(lines)
+
+
 def build(models, runtag, n_papers, out_path):
     lines = []
     lines.append('# Evaluation Inspection Report')
@@ -75,6 +148,8 @@ def build(models, runtag, n_papers, out_path):
             lines.append(f'\n\n## Paper `{pid}`')
             if title:
                 lines.append(f'*{title}*')
+            lines.append('')
+            lines.append(prompt_info_block(paper))
             lines.append('')
 
             for q in paper['questions']:
