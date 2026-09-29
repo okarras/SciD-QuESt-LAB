@@ -2043,7 +2043,7 @@ input:focus-visible {
 
 .bench-detail__stat-rail {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 1rem;
   margin: 2rem 0 3rem;
 }
@@ -2138,13 +2138,6 @@ input:focus-visible {
   font-size: 1.1rem;
 }
 
-.bench-detail__composition {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 2.5rem;
-  margin-top: 1.5rem;
-}
-
 .bench-detail__bar-group { margin-bottom: 1.1rem; }
 .bench-detail__bar-group:last-child { margin-bottom: 0; }
 
@@ -2176,7 +2169,7 @@ input:focus-visible {
 
 .bench-detail__fact-list {
   list-style: none;
-  margin: 0;
+  margin: 1.5rem 0 0;
   padding: 0;
   font-size: 0.85rem;
 }
@@ -2276,7 +2269,6 @@ input:focus-visible {
 
 @media (max-width: 720px) {
   .bench-detail__stat-rail { grid-template-columns: repeat(2, 1fr); }
-  .bench-detail__composition { grid-template-columns: 1fr; }
   .bench-detail__field-groups { grid-template-columns: 1fr; }
   .bench-detail__flow { flex-direction: column; }
   .bench-detail__flow-arrow { transform: rotate(90deg); width: 100%; padding: 0.25rem 0; }

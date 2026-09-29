@@ -15,9 +15,9 @@ export default function BenchmarkingDetailPage({ onBack }: BenchmarkingDetailPag
           Can a model read a paper the way an expert annotator does?
         </h1>
         <p className="api-detail__desc">
-          A 109-paper automated evaluation of the EmpiRE-Compass extraction
-          system across 25 dynamic question fields, measuring pure zero-shot
-          capability with no human correction in the loop.
+          A 109-paper automated evaluation of the extraction system across
+          25 dynamic question fields, measuring pure zero-shot capability
+          with no human correction in the loop.
         </p>
 
         <div className="bench-detail__stat-rail">
@@ -33,10 +33,6 @@ export default function BenchmarkingDetailPage({ onBack }: BenchmarkingDetailPag
             <span className="bench-detail__stat-num">25</span>
             <span className="bench-detail__stat-label">dynamic question fields per paper</span>
           </div>
-          <div className="bench-detail__stat">
-            <span className="bench-detail__stat-num">0</span>
-            <span className="bench-detail__stat-label">human-in-the-loop corrections</span>
-          </div>
         </div>
 
         {/* 01 — What we measure */}
@@ -45,19 +41,20 @@ export default function BenchmarkingDetailPage({ onBack }: BenchmarkingDetailPag
 
           <blockquote className="bench-detail__pull">
             Can an LLM accurately extract domain-specific scientific research
-            parameters when given different structural context configurations?
+            parameters, and does injecting structural context improve that
+            extraction?
           </blockquote>
 
           <p className="api-detail__desc">
-            Each scenario is a verified paper extraction task. A model is shown
-            a scientific publication under a particular structural context
-            configuration and asked to populate the same 25 fields — things
-            like research paradigm, analysis methods, and statistical metrics
-            — that an expert annotator would fill in by hand.
+            Each scenario is a single paper-extraction task. A model is shown
+            a scientific publication, with or without added structural
+            context, and asked to populate the same 25-field questionnaire
+            an expert annotator would complete by hand, covering things like
+            research paradigm, analysis methods, and statistical metrics.
           </p>
           <p className="api-detail__desc">
-            Recommendations are generated through standard API completions,
-            with no intervention or correction along the way. That isolates a
+            Extractions are produced through standard API completions, with
+            no intervention or correction along the way. That isolates a
             single question: how good is the model's raw, first-pass reading
             of the paper?
           </p>
@@ -65,14 +62,14 @@ export default function BenchmarkingDetailPage({ onBack }: BenchmarkingDetailPag
           <div className="bench-detail__flow">
             <div className="bench-detail__flow-step">
               <span className="bench-detail__flow-tag">input</span>
-              <h4>Paper + context config</h4>
-              <p>A verified OA or publisher PDF, paired with one structural context setup.</p>
+              <h4>Paper + optional context</h4>
+              <p>An open-access or publisher PDF, run with or without structural context.</p>
             </div>
             <div className="bench-detail__flow-arrow">→</div>
             <div className="bench-detail__flow-step">
               <span className="bench-detail__flow-tag">process</span>
               <h4>Zero-shot completion</h4>
-              <p>Model fills 25 question fields via a single API call, unedited.</p>
+              <p>Each of the 25 fields is answered in its own LLM request, unedited.</p>
             </div>
             <div className="bench-detail__flow-arrow">→</div>
             <div className="bench-detail__flow-step">
@@ -113,14 +110,18 @@ export default function BenchmarkingDetailPage({ onBack }: BenchmarkingDetailPag
           </div>
 
           <p className="api-detail__desc">
-            GPT-4o-mini + Ctx is what you deploy in a live curation workflow: a
-            context-aware model receiving compounding chains of verified prior
-            answers. GPT-4o-mini (Zero-Shot) acts as an unassisted baseline.
+            GPT-4o-mini + Ctx is the context-aware condition: for each
+            question, the model is also given the verified answers to related
+            sibling questions and told to stay consistent with them.
+            GPT-4o-mini (Zero-Shot) is the same model with no such context,
+            the unassisted baseline.
           </p>
           <p className="api-detail__desc">
-            The gap between the zero-shot baseline and GPT-4o-mini + Ctx
-            measures the isolated impact of structural context injection on
-            LLM extraction accuracy.
+            The gap between the two measures the impact of injecting verified
+            sibling context on extraction accuracy. Because the injected
+            answers are drawn from the expert reference, this is best read as
+            an upper bound on what structural context can contribute, not
+            live-deployment performance.
           </p>
         </div>
 
@@ -165,30 +166,13 @@ export default function BenchmarkingDetailPage({ onBack }: BenchmarkingDetailPag
             KG-EmpiRE dataset.
           </p>
 
-          <div className="bench-detail__composition">
-            <div>
-              <div className="bench-detail__bar-group">
-                <div className="bench-detail__bar-label"><span>Papers</span><span>109</span></div>
-                <div className="bench-detail__bar-track"><div className="bench-detail__bar-fill" style={{ width: '100%' }} /></div>
-              </div>
-              <div className="bench-detail__bar-group">
-                <div className="bench-detail__bar-label"><span>Question extractions</span><span>1,274</span></div>
-                <div className="bench-detail__bar-track"><div className="bench-detail__bar-fill bench-detail__bar-fill--accent" style={{ width: '100%' }} /></div>
-              </div>
-              <div className="bench-detail__bar-group">
-                <div className="bench-detail__bar-label"><span>Fields per paper</span><span>25</span></div>
-                <div className="bench-detail__bar-track"><div className="bench-detail__bar-fill" style={{ width: '22%' }} /></div>
-              </div>
-            </div>
-
-            <ul className="bench-detail__fact-list">
-              <li><span>Source</span><span>Open Research Knowledge Graph</span></li>
-              <li><span>Reference</span><span>Expert-annotated KG-EmpiRE</span></li>
-              <li><span>Document types</span><span>Open Access + publisher PDFs</span></li>
-              <li><span>Venues</span><span>RE &amp; REFSQ proceedings</span></li>
-              <li><span>Evaluation type</span><span>Zero-shot, unedited</span></li>
-            </ul>
-          </div>
+          <ul className="bench-detail__fact-list">
+            <li><span>Source</span><span>Open Research Knowledge Graph</span></li>
+            <li><span>Reference</span><span>Expert-annotated KG-EmpiRE</span></li>
+            <li><span>Document types</span><span>Open Access + publisher PDFs</span></li>
+            <li><span>Venues</span><span>RE &amp; REFSQ proceedings</span></li>
+            <li><span>Evaluation type</span><span>Zero-shot, unedited</span></li>
+          </ul>
         </div>
 
         {/* 05 — Results */}
@@ -198,8 +182,8 @@ export default function BenchmarkingDetailPage({ onBack }: BenchmarkingDetailPag
           <p className="api-detail__desc">
             Overall Top-1 accuracy across all 1,274 evaluated questions, by
             model. GPT-4o-mini + Ctx is the primary experimental
-            configuration — the same model as the zero-shot baseline, with
-            dynamic structural context injected.
+            configuration: the same model as the zero-shot baseline, with
+            verified sibling context injected.
           </p>
 
           <div className="bench-detail__bar-group">
@@ -212,12 +196,12 @@ export default function BenchmarkingDetailPage({ onBack }: BenchmarkingDetailPag
           </div>
           <div className="bench-detail__bar-group">
             <div className="bench-detail__bar-label"><span>GPT-4o-mini + Ctx</span><span>58.8% (749/1,274)</span></div>
-            <div className="bench-detail__bar-track"><div className="bench-detail__bar-fill bench-detail__bar-fill--accent" style={{ width: '58.8%' }} /></div>
+            <div className="bench-detail__bar-track"><div className="bench-detail__bar-fill" style={{ width: '58.8%' }} /></div>
           </div>
 
           <p className="api-detail__desc">
             Breaking accuracy down by question data type shows where
-            structural context helps most — and the one place it doesn't:
+            structural context helps most, and the one place it doesn't:
           </p>
 
           <div className="comparison-table-wrap">
@@ -273,18 +257,18 @@ export default function BenchmarkingDetailPage({ onBack }: BenchmarkingDetailPag
 
           <p className="api-detail__desc">
             Structural context drives the largest gain on Abstract Text
-            (34.6% → 49.6%) and a solid, stable gain on Boolean fields
-            (57.4% → 61.7%). Multi-Select sees a minor positive shift
-            (59.4% → 60.7%). Single-Select is the one data type where
-            context causes a small regression (62.6% → 59.4%) — see{' '}
+            (34.6% → 49.6%, +15.0 pts) and a clear gain on Boolean fields
+            (57.4% → 61.7%, +4.3 pts). Multi-Select sees a minor positive
+            shift (59.4% → 60.7%). Single-Select is the one data type where
+            context causes a small regression (62.6% → 59.4%); see{' '}
             <a href="#bench-caveats">what the numbers do not prove</a> below.
           </p>
 
           <p className="api-detail__desc">
             The table above grades only the first (Top-1) suggestion the
-            model returns, even though the interface shows the curator
-            three. Under a relaxed Top-3 metric — a success if any of the
-            three clears the threshold — accuracy rises across the board:
+            model returns, even though the interface shows the curator three.
+            Under a relaxed Top-3 metric, counting a success if any of the
+            three clears the threshold, accuracy rises across the board:
             64.2% (818/1,274) for GPT-3.5, 76.1% (969/1,274) for
             GPT-4o-mini, and 77.9% (993/1,274) for GPT-4o-mini + Ctx.
           </p>
@@ -294,8 +278,8 @@ export default function BenchmarkingDetailPage({ onBack }: BenchmarkingDetailPag
         <div className="bench-detail__section">
           <p className="api-detail__section-label">06 — Question fields</p>
           <p className="api-detail__desc">
-            Each paper is scored across 25 fields. A representative sample of
-            the categories they fall under:
+            Each paper is scored across a set of fields from the
+            empirical-research questionnaire. The categories they fall under:
           </p>
 
           <div className="bench-detail__field-groups">
@@ -303,27 +287,27 @@ export default function BenchmarkingDetailPage({ onBack }: BenchmarkingDetailPag
               <h4>Research design</h4>
               <ul>
                 <li>Research paradigm</li>
-                <li>Research method</li>
-                <li>Study type</li>
-                <li>Data collection approach</li>
+                <li>Research questions &amp; type</li>
+                <li>Data collection methods</li>
+                <li>Data type</li>
               </ul>
             </div>
             <div className="bench-detail__field-group">
-              <h4>Analysis</h4>
+              <h4>Data analysis</h4>
               <ul>
                 <li>Analysis methods</li>
-                <li>Statistical metrics</li>
-                <li>Validity considerations</li>
-                <li>Tooling used</li>
+                <li>Descriptive measures</li>
+                <li>Statistical tests</li>
+                <li>Hypotheses &amp; type</li>
               </ul>
             </div>
             <div className="bench-detail__field-group">
-              <h4>Context</h4>
+              <h4>Validity &amp; threats</h4>
               <ul>
-                <li>Sample / population</li>
-                <li>Domain of application</li>
-                <li>Replication package</li>
-                <li>Limitations reported</li>
+                <li>Threats to validity reported</li>
+                <li>Uncategorized threats mentioned</li>
+                <li>Answer hidden</li>
+                <li>Method type &amp; name</li>
               </ul>
             </div>
           </div>
