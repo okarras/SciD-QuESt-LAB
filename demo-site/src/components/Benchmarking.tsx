@@ -7,9 +7,8 @@ export default function Benchmarking() {
         </h2>
 
         <div className="bm-summary">
-          <p className="bm-eyebrow">Benchmarking</p>
           <p className="bm-headline">
-            Evaluated across 109 papers, zero-shot, no human correction.
+            Evaluated zero-shot, with no human correction in the loop.
           </p>
 
           <div className="bm-summary-stats">
