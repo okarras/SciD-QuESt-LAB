@@ -43,9 +43,11 @@ results/
 evaluation/results-*.json
 evaluation/evaluation-results-*.xlsx
 evaluation/inspection-*.json
-evaluation/inspection-report*.md
 evaluation/raw-prompt-response*.txt
 *.log
+
+# Analysis / results documents (kept locally, not committed)
+evaluation/docs/
 
 # Environment Variables
 .env

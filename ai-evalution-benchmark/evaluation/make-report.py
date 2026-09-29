@@ -225,6 +225,9 @@ def build(models, runtag, n_papers, out_path):
                 lines.append(f'**Verdict:** S1 = {verdict_s1}   |   Any-of-3 = {verdict_any}')
                 lines.append('')
 
+    out_dir = os.path.dirname(out_path)
+    if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
     with open(out_path, 'w') as f:
         f.write('\n'.join(lines))
     print(f'Wrote {out_path}')
@@ -246,7 +249,7 @@ def main():
                              'glm52:GLM-5.2'])
     ap.add_argument('--runtag', default='run2')
     ap.add_argument('--papers', type=int, default=5)
-    ap.add_argument('--output', default='inspection-report.md')
+    ap.add_argument('--output', default='docs/inspection-report.md')
     args = ap.parse_args()
     build(parse_pairs(args.models), args.runtag, args.papers, args.output)
 
